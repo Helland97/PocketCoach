@@ -236,3 +236,9 @@ class MediaPipeVideoProcessor:
         result["path"] = out_path
         print("Verdict:", counter.get_results())
         return result
+
+        result = counter.get_results()
+        result["video"] = "id"
+        result["path"] = out_path
+        print("Verdict:", counter.get_results())
+        return result

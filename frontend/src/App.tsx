@@ -76,9 +76,12 @@ export default function App() {
 
     return (
         <div className={styles.container}>
-            <h1 className={styles.title}>AI Spotter</h1>
+            <h1 className={styles.title}>Welcome to AI Spotter</h1>
+            <h2 className={styles.info} >AI Spotter helps you review and correct lifting technique by uploading a video of
+                yourself performing one of the following lifts .... </h2>
 
-            <div style={{ marginBottom: "1rem" }}>
+
+            <div className={styles.upload}>
                 <input
                     type="file"
                     accept="video/mp4,video/gif"
@@ -90,37 +93,47 @@ export default function App() {
             {error && <p style={{ color: "crimson" }}>{error}</p>}
 
             {video && (
-                <div className={styles.card}>
-                    <p className={styles.uploadInfo}>
-                        <strong>Uploaded:</strong> {video.originalName ?? video.name} —{" "}
-                        <strong>ID:</strong> {video.id}
-                    </p>
-                    <button
-                        onClick={handleAnalysis}
-                        disabled={busy}
-                        className={styles.button}
-                    >
-                        Do Analysis
-                    </button>
+                <div className={verdict ? styles.split : styles.card}>
+                    <div className={styles.videoSection}>
+                        <div className={styles.card}>
+                            <p className={styles.uploadInfo}>
+                                <strong>Uploaded:</strong> {video.name}
+                            </p>
 
-                    {video?.name && (
-                        <div style={{ marginTop: 12 }}>
-                            <video
-                                controls
-                                src={videoUrl}
-                                className={styles.video}
-                            />
+                            {video?.name && (
+                                <div style={{ marginTop: 12 }}>
+                                    <video
+                                        controls
+                                        src={videoUrl}
+                                        className={styles.video}
+                                    />
+                                </div>
+                            )}
+                            <button
+                                onClick={handleAnalysis}
+                                disabled={busy}
+                                className={styles.button}
+                            >
+                                Do Analysis
+                            </button>
+                        </div>
+                    </div>
+
+                    {verdict && (
+                        <div className={styles.verdictSection}>
+                            <div className={styles.verdictBox}>
+                                <h2>AI Verdict</h2>
+                                <pre className={styles.verdictPre}>
+                                    {typeof verdict === "string"
+                                        ? JSON.stringify(JSON.parse(verdict), null, 2)
+                                        : JSON.stringify(verdict, null, 2)}
+                                </pre>
+
+                            </div>
                         </div>
                     )}
                 </div>
             )}
 
-            {verdict && (
-                <div className={styles.verdictBox}>
-                    <h2>AI Verdict</h2>
-                    <pre className={styles.verdictPre}>{verdict}</pre>
-                </div>
-            )}
         </div>
-    );
-}
+    )}

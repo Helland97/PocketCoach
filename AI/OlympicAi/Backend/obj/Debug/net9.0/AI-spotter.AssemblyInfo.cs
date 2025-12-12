@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AI-spotter")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b1841659277aefb27703931be26d404046769a5c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5d672c53836ac9068512a8c2fc65975650e8c970")]
 [assembly: System.Reflection.AssemblyProductAttribute("AI-spotter")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AI-spotter")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
