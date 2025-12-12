@@ -1,4 +1,4 @@
 videos/
 ProcessedVideos/
-venv/
-AI/OlympicAi/
+AI/MediaPipe_landmarks/*
+AI/embedding/*
