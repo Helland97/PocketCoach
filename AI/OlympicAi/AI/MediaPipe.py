@@ -1,6 +1,7 @@
 import os
 import time
 import cv2
+import json
 import numpy as np
 import mediapipe as mp
 from Utils.utils.utils import *
@@ -156,6 +157,7 @@ class MediaPipeVideoProcessor:
             raise NotImplementedError(f"Exercise '{exercise}' not implemented.")
 
         mp_pose = mp.solutions.pose
+        landmarks_data = []  # ✅ Collect landmarks per frame
         with mp_pose.Pose(
             static_image_mode=False,         # Use tracking across frames
             model_complexity=2,              # Use the most accurate model
@@ -171,6 +173,19 @@ class MediaPipeVideoProcessor:
 
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 results = pose.process(rgb_frame)
+                
+                if results.pose_landmarks:
+                    frame_landmarks = []
+                    for lm in results.pose_landmarks.landmark:
+                        frame_landmarks.append([lm.x, lm.y, lm.z])  # Only x, y, z
+
+                    # Convert to NumPy array
+                    frame_landmarks = np.array(frame_landmarks)  # shape: (joints, 3)
+                    landmarks_data.append(frame_landmarks)
+
+
+
+                
                 # ✅ add counter update here
                 if results.pose_landmarks:
                     counter.update(results.pose_landmarks.landmark)
@@ -179,9 +194,26 @@ class MediaPipeVideoProcessor:
                     frame = self.draw_pose(frame, results, all_landmarks, calculate_angle)
 
                 out.write(frame)
+                
+            # Convert all frames to a single array: (frames, joints, dimensions)
+            landmarks_data = np.stack(landmarks_data)  # shape: (frames, joints, 3)
 
         cap.release()
         out.release()
+        
+        # ✅ Make sure the folder exists
+        os.makedirs("AI/MediaPipe_landmarks", exist_ok=True)
+
+        # ✅ Create path using the same base filename as the video
+        base_name = os.path.splitext(os.path.basename(output_path))[0]
+        npy_output_path = os.path.join("AI/MediaPipe_landmarks", base_name + "_landmarks.npy")
+
+        # ✅ Save NumPy array
+        np.save(npy_output_path, landmarks_data)
+
+
+        print(f"Landmarks saved to {npy_output_path}")
+        
         print(f"Video processed and saved to {output_path}")
 
         # ✅ return verdict with counter results
@@ -204,4 +236,3 @@ class MediaPipeVideoProcessor:
         result["path"] = out_path
         print("Verdict:", counter.get_results())
         return result
-

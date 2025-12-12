@@ -49,3 +49,27 @@ def calculate_angle(p1, p2, p3):
     cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
     angle = np.arccos(cosine_angle)
     return np.degrees(angle)
+
+
+
+def calculate_angle_3d(p1, p2, p3):
+    """
+    Calculate the angle between three points in 3D space.
+    Args:
+        p1, p2, p3: Points in (x, y, z) format.
+    Returns:
+        Angle in degrees.
+    """
+    # Create 3D vectors
+    a = np.array([p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]])
+    b = np.array([p3[0] - p2[0], p3[1] - p2[1], p3[2] - p2[2]])
+
+    # Compute cosine using dot product formula
+    cosine_angle = np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+    # Clamp value to prevent numerical drift outside [-1, 1]
+    cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
+
+    # Angle in degrees
+    angle = np.arccos(cosine_angle)
+    return np.degrees(angle)
