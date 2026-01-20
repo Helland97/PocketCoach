@@ -6,8 +6,8 @@ if __name__ == "__main__":
     try:
         import traceback
         # Paths to input and output video files
-        input_video = "videos/back_squat.mp4"      # Replace with your actual test video path
-        output_video = "squat_back_res.mp4"    # This will be created with skeleton overlay
+        input_video = "videos/new_back_squat.mp4"      # Replace with your actual test video path
+        output_video = "squat_back_new.mp4"    # This will be created with skeleton overlay
 
         # Create processor and run
         processor = MediaPipeVideoProcessor()
