@@ -134,37 +134,73 @@ public class VideoController : ControllerBase{
 
     [HttpPost("upload")]
     public async Task<IActionResult> UploadAndVerdict(IFormFile video){
-        // 1. Upload the video
-        var upload = this.Create(video) as ObjectResult;
-        // Ensure the upload was a success
-        if (upload?.StatusCode != 201){
-            return StatusCode(upload?.StatusCode ?? 500);
-        }
-        Video? videoReference = (Video?)upload.Value;
-        if (videoReference == null){
-            return StatusCode(500);
-        }
-        // 2. Retrieve verdict
-        var verdict = await this.GetAI("", videoReference.Id) as ObjectResult;
-        if (verdict?.StatusCode != 200){
-            return StatusCode(verdict?.StatusCode ?? 500);
-        }
-        // 3. Delete video
-        if (verdict?.Value != null){
-            JsonDocument doc = JsonDocument.Parse((String) verdict.Value);
-            JsonElement root = doc.RootElement;
-            string path = root.GetProperty("path").GetString() ?? ""; // Access the "path" property
-            // Delete processed video
-            var delete = this.DeletePath(path) as NoContentResult;
-            if (delete == null){
-                return StatusCode(500);
+        var startTime = DateTime.Now;
+        try {
+            Console.WriteLine($"[.NET] Starting UploadAndVerdict");
+
+            // 1. Upload the video
+            var uploadStart = DateTime.Now;
+            var upload = this.Create(video) as ObjectResult;
+            var uploadTime = (DateTime.Now - uploadStart).TotalSeconds;
+            Console.WriteLine($"[.NET] Upload completed in {uploadTime:F2}s");
+
+            // Ensure the upload was a success
+            if (upload?.StatusCode != 201){
+                return StatusCode(upload?.StatusCode ?? 500, "Upload failed");
             }
-            // Delete original video
-            delete = this.Delete(videoReference.Id) as NoContentResult;
-            if (delete == null){
-                return StatusCode(500);
+            Video? videoReference = (Video?)upload.Value;
+            if (videoReference == null){
+                return StatusCode(500, "Video reference is null");
             }
+
+            Console.WriteLine($"[.NET] Uploaded video path: {videoReference.Path}");
+
+            // 2. Retrieve verdict
+            var aiStart = DateTime.Now;
+            Console.WriteLine($"[.NET] Calling Python backend for AI processing...");
+            var verdict = await this.GetAI("", videoReference.Id) as ObjectResult;
+            var aiTime = (DateTime.Now - aiStart).TotalSeconds;
+            Console.WriteLine($"[.NET] AI processing completed in {aiTime:F2}s");
+
+            if (verdict?.StatusCode != 200){
+                var errorMsg = verdict?.Value?.ToString() ?? "Unknown error";
+                Console.WriteLine($"[.NET] GetAI failed: {errorMsg}");
+                return StatusCode(verdict?.StatusCode ?? 500, errorMsg);
+            }
+
+            var totalTime = (DateTime.Now - startTime).TotalSeconds;
+            Console.WriteLine($"[.NET] Total UploadAndVerdict time: {totalTime:F2}s");
+            Console.WriteLine($"[.NET] Verdict: {verdict.Value}");
+
+            // 3. Return verdict (deletion will be handled by frontend when needed)
+            return verdict?.Value != null ? Ok(verdict.Value) : StatusCode(500, "Verdict is null");
+        } catch (Exception ex) {
+            var totalTime = (DateTime.Now - startTime).TotalSeconds;
+            Console.WriteLine($"[.NET] Error in UploadAndVerdict after {totalTime:F2}s: {ex.Message}");
+            Console.WriteLine($"[.NET] Stack trace: {ex.StackTrace}");
+            return StatusCode(500, $"Error: {ex.Message}");
         }
-        return verdict?.Value != null ? Ok(verdict.Value) : StatusCode(500);
+    }
+
+    [HttpPost("cleanup")]
+    public IActionResult CleanupVideos([FromBody] JsonElement data){
+        // Clean up both original and processed videos
+        try{
+            if (data.TryGetProperty("videoId", out JsonElement videoIdElement)){
+                int videoId = videoIdElement.GetInt32();
+                var deleteOriginal = this.Delete(videoId);
+            }
+
+            if (data.TryGetProperty("processedPath", out JsonElement pathElement)){
+                string? path = pathElement.GetString();
+                if (path != null){
+                    var deleteProcessed = this.DeletePath(path);
+                }
+            }
+            return NoContent();
+        }
+        catch (Exception e){
+            return StatusCode(500, e.Message);
+        }
     }
 }

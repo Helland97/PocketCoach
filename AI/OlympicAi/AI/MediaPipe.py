@@ -130,12 +130,18 @@ class MediaPipeVideoProcessor:
             all_landmarks (bool): Whether to draw all landmarks or exclude some.
             draw_skeleton (bool): Whether to draw the skeleton at all.
         """
+        import time
+        start_time = time.time()
+        print(f"[MediaPipe] Starting video processing: {input_path}")
+
         # Ensure ProcessedVideos folder exists
         os.makedirs("ProcessedVideos", exist_ok=True)
 
         # Force output into ProcessedVideos folder
         output_path = os.path.join("ProcessedVideos", os.path.basename(output_path))
+        print(f"[MediaPipe] Output path: {output_path}")
 
+        print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Opening video capture...")
         cap = cv2.VideoCapture(input_path)
         if not cap.isOpened():
             raise IOError(f"Cannot open video file: {input_path}")
@@ -143,12 +149,24 @@ class MediaPipeVideoProcessor:
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        print(f"[MediaPipe] Video info: {width}x{height}, {fps} fps, {total_frames} frames")
 
-        fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-        if not out.isOpened():
+        # Try H.264 codec first, fall back to mp4v if not available
+        print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Setting up video writer...")
+        fourcc_codes = ['avc1', 'H264', 'X264', 'mp4v']
+        out = None
+        for codec in fourcc_codes:
+            fourcc = cv2.VideoWriter_fourcc(*codec)
+            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            if out.isOpened():
+                print(f"[MediaPipe] Using codec: {codec}")
+                break
+            out.release()
+
+        if not out or not out.isOpened():
             cap.release()
-            raise IOError(f"Cannot open video writer for: {output_path}")
+            raise IOError(f"Cannot open video writer with any codec for: {output_path}")
 
         # ✅ choose exercise counter
         if exercise == "squat":
@@ -158,6 +176,8 @@ class MediaPipeVideoProcessor:
 
         mp_pose = mp.solutions.pose
         landmarks_data = []  # ✅ Collect landmarks per frame
+        print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Starting frame processing...")
+        frame_count = 0
         with mp_pose.Pose(
             static_image_mode=False,         # Use tracking across frames
             model_complexity=2,              # Use the most accurate model
@@ -165,11 +185,15 @@ class MediaPipeVideoProcessor:
             min_detection_confidence=0.7,    # Only accept decent detections
             min_tracking_confidence=0.7      # Only track when confident
         ) as pose:
-            
+
             while True:
                 ret, frame = cap.read()
                 if not ret:
                     break
+
+                frame_count += 1
+                if frame_count % 30 == 0:  # Log every 30 frames
+                    print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Processed {frame_count}/{total_frames} frames")
 
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 results = pose.process(rgb_frame)
@@ -198,10 +222,12 @@ class MediaPipeVideoProcessor:
             # Convert all frames to a single array: (frames, joints, dimensions)
             landmarks_data = np.stack(landmarks_data)  # shape: (frames, joints, 3)
 
+        print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Releasing video resources...")
         cap.release()
         out.release()
-        
+
         # ✅ Make sure the folder exists
+        print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Saving landmarks...")
         os.makedirs("AI/MediaPipe_landmarks", exist_ok=True)
 
         # ✅ Create path using the same base filename as the video
@@ -211,10 +237,9 @@ class MediaPipeVideoProcessor:
         # ✅ Save NumPy array
         np.save(npy_output_path, landmarks_data)
 
-
-        print(f"Landmarks saved to {npy_output_path}")
-        
-        print(f"Video processed and saved to {output_path}")
+        print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Landmarks saved to {npy_output_path}")
+        print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Video processing complete! Total time: {time.time()-start_time:.2f}s")
+        print(f"[MediaPipe] Video saved to: {output_path}")
 
         # ✅ return verdict with counter results
         return self.verdict(output_path, counter)

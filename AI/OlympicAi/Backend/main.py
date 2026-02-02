@@ -82,8 +82,31 @@ async def process_in_memory(filename: str):
 
 @app.get("/verdict", response_class=JSONResponse)
 async def get_verdict(path: str):
-    processor = MediaPipeVideoProcessor()
-    return processor.process_video(path, path)
+    import time
+    start_time = time.time()
+    try:
+        print(f"[{time.time()-start_time:.2f}s] Received verdict request for path: {path}")
+        print(f"Current working directory: {os.getcwd()}")
+
+        # Check if file exists
+        if not os.path.exists(path):
+            print(f"ERROR: File not found at path: {path}")
+            raise HTTPException(status_code=404, detail=f"Video file not found at: {path}")
+
+        file_size_mb = os.path.getsize(path) / (1024 * 1024)
+        print(f"[{time.time()-start_time:.2f}s] File exists ({file_size_mb:.2f} MB), starting processing...")
+
+        processor = MediaPipeVideoProcessor()
+        result = processor.process_video(path, path)
+
+        print(f"[{time.time()-start_time:.2f}s] Processing complete. Total time: {time.time()-start_time:.2f}s")
+        print(f"Result: {result}")
+        return result
+    except Exception as e:
+        print(f"ERROR in get_verdict after {time.time()-start_time:.2f}s: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/process_video/")
 async def process_video(file: UploadFile = File(...)):
