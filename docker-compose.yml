@@ -1,0 +1,66 @@
+services:
+  # Frontend - React app served by nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - dotnet-backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # .NET Backend - API Gateway
+  dotnet-backend:
+    build:
+      context: ./AI/OlympicAi/backend
+      dockerfile: Dockerfile.dotnet
+    ports:
+      - "5246:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - PythonBackendUrl=http://python-backend:8000
+    volumes:
+      - video-storage:/app/Videos
+      - processed-storage:/app/ProcessedVideos
+    depends_on:
+      - python-backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Python Backend - AI Processing with MediaPipe
+  python-backend:
+    build:
+      context: ./AI/OlympicAi
+      dockerfile: Dockerfile.python
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - video-storage:/app/Videos
+      - processed-storage:/app/ProcessedVideos
+      - landmarks-storage:/app/AI/MediaPipe_landmarks
+    networks:
+      - app-network
+    restart: unless-stopped
+    # Increase memory limit for AI processing
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  video-storage:
+  processed-storage:
+  landmarks-storage:

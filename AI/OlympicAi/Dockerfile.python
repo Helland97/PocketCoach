@@ -1,0 +1,43 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies for OpenCV and MediaPipe
+RUN apt-get update && apt-get install -y \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
+    ffmpeg \
+    libx264-dev \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Upgrade pip and install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy the AI module (MediaPipe code)
+COPY AI/ ./AI/
+
+# Copy the Utils module (required by MediaPipe)
+COPY Utils/ ./Utils/
+
+# Copy the backend module (main.py)
+COPY backend/main.py ./backend/
+
+# Create necessary directories
+RUN mkdir -p Videos ProcessedVideos AI/MediaPipe_landmarks backend
+
+# Expose port
+EXPOSE 8000
+
+# Set Python to run in unbuffered mode for better logging
+ENV PYTHONUNBUFFERED=1
+
+# Run the FastAPI application
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

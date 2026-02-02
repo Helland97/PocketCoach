@@ -1,0 +1,35 @@
+# Stage 1: Build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+
+WORKDIR /src
+
+# Copy csproj and restore dependencies
+COPY AI-spotter.csproj .
+RUN dotnet restore "AI-spotter.csproj"
+
+# Copy everything else and build
+COPY . .
+RUN dotnet build "AI-spotter.csproj" -c Release -o /app/build
+
+# Stage 2: Publish
+FROM build AS publish
+RUN dotnet publish "AI-spotter.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+# Stage 3: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+
+WORKDIR /app
+
+# Create directories for video storage
+RUN mkdir -p Videos ProcessedVideos
+
+# Copy published app
+COPY --from=publish /app/publish .
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:8080
+
+ENTRYPOINT ["dotnet", "AI-spotter.dll"]

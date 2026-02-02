@@ -1,5 +1,8 @@
 import numpy as np
-from mediapipe.python.solutions.pose import PoseLandmark
+import mediapipe as mp
+
+# Access PoseLandmark through mediapipe module due to packaging structure
+PoseLandmark = mp.solutions.pose.PoseLandmark
 
 
 # Dictionary of joint indices for easy access

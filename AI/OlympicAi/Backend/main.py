@@ -162,12 +162,12 @@ def stream_in_memory(filename: str):
 
 
 
-@app.get("/view_processed/{filename}")
+@app.get("/view_processed/{filename:path}")
 def view_processed_file(filename: str):
-    file_path = os.path.join(filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path, media_type="video/mp4")
+    # filename already contains the full path (e.g., "ProcessedVideos/video.mp4")
+    if not os.path.exists(filename):
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+    return FileResponse(filename, media_type="video/mp4")
 
 
 

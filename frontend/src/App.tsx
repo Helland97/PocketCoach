@@ -85,8 +85,8 @@ export default function App() {
                 const verdictData = JSON.parse(text);
                 if (verdictData.path) {
                     setProcessedVideoPath(verdictData.path);
-                    // Update video URL to point to processed video
-                    setVideoUrl(`http://localhost:8000/view_processed/${encodeURIComponent(verdictData.path)}`);
+                    // Update video URL to point to processed video (relative URL works in both dev and production)
+                    setVideoUrl(`/view_processed/${encodeURIComponent(verdictData.path)}`);
                 }
             }
             else{
@@ -159,7 +159,7 @@ export default function App() {
                                 />
                             </div>
 
-                            {video?.name && (
+                            {videoUrl && (
                                 <div style={{ marginTop: 12 }}>
                                     <video
                                         key={videoUrl}

@@ -1,0 +1,43 @@
+# Ignore Python files (since this directory contains both .NET and Python)
+main.py
+__pycache__/
+*.py[cod]
+*.so
+
+# .NET build artifacts
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dbmdl
+*.jfm
+*.pfx
+*.publishsettings
+
+# Video files (will be in volumes)
+Videos/
+ProcessedVideos/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README*
+
+# Test files
+*.http

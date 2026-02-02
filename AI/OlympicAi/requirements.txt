@@ -1,5 +1,13 @@
-numpy
-opencv-python
-mediapipe
-fastapi
-uvicorn[standard]
+# Core dependencies - matching working conda environment
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+mediapipe==0.10.21
+protobuf==4.25.8
+
+# FastAPI and server
+fastapi==0.115.14
+uvicorn[standard]==0.35.0
+python-multipart==0.0.6
+
+# Additional dependencies for production
+pydantic==2.11.7

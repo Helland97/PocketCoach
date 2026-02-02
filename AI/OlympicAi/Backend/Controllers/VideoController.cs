@@ -9,31 +9,34 @@ using System.Text.Json;
 
 public interface IAiClientConnect{
     HttpClient AiClient {get;}
-    Task<HttpResponseMessage> Connect(string path);
+    Task<string?> Connect(string path);
 }
 
 public class AiClientConnect : IAiClientConnect{
     public HttpClient AiClient {get;}
-    public AiClientConnect(HttpClient client){
+    private readonly string _pythonBackendUrl;
+
+    public AiClientConnect(HttpClient client, IConfiguration configuration){
         AiClient = client;
+        _pythonBackendUrl = configuration["PythonBackendUrl"] ?? "http://localhost:8000";
     }
 //    public static async Task<VideoController> Create(){
 //        var controller = new VideoController();
 //        await controller.ConnectAiClient();
 //        return controller;
 //    }
-    public async Task<HttpResponseMessage> Connect(string path){
+    public async Task<string?> Connect(string path){
         try{
-            using HttpResponseMessage response = await AiClient.GetAsync($"http://localhost:8000/verdict?path={path}");
+            using HttpResponseMessage response = await AiClient.GetAsync($"{_pythonBackendUrl}/verdict?path={path}");
             response.EnsureSuccessStatusCode();
             string responseBody = await response.Content.ReadAsStringAsync();
             Console.WriteLine(responseBody);
-            return response;
+            return responseBody;
         }
         catch (HttpRequestException e){
             Console.WriteLine("\nException caught");
             Console.WriteLine("Exception message: {0}", e.Message);
-            return new HttpResponseMessage(System.Net.HttpStatusCode.NoContent);
+            return null;
         }
     }
 }
@@ -69,13 +72,12 @@ public class VideoController : ControllerBase{
             if (path == null){
                 throw new NullReferenceException("id or path is null");
             }
-            //HttpResponseMessage result = await AiClient.Connect(path);
-            HttpResponseMessage result = await AiClient.AiClient.GetAsync($"http://localhost:8000/verdict?path={path}");
-            if (result.IsSuccessStatusCode){
-                return Ok(result.Content.ReadAsStringAsync().Result);
+            string? result = await AiClient.Connect(path);
+            if (result != null){
+                return Ok(result);
             }
             else{
-                return StatusCode((int) result.StatusCode, result.ReasonPhrase);
+                return StatusCode(500, "Python backend returned no content");
             }
         }
         catch (HttpRequestException e){

@@ -4,8 +4,8 @@ import cv2
 import json
 import numpy as np
 import mediapipe as mp
+import subprocess
 from Utils.utils.utils import *
-from mediapipe.python.solutions.pose import PoseLandmark
 from Utils.counters.exercise_counter import ExerciseCounter
 from Utils.counters.squat_counter import SquatCounter
 
@@ -225,6 +225,47 @@ class MediaPipeVideoProcessor:
         print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Releasing video resources...")
         cap.release()
         out.release()
+
+        # Re-encode with H.264 using ffmpeg command line for browser compatibility
+        print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Re-encoding video with H.264...")
+        temp_output = output_path + ".temp.mp4"
+        try:
+            # Move original to temp file
+            os.rename(output_path, temp_output)
+
+            # Re-encode with H.264
+            ffmpeg_cmd = [
+                'ffmpeg', '-y',  # Overwrite output
+                '-i', temp_output,  # Input file
+                '-c:v', 'libx264',  # Video codec: H.264
+                '-preset', 'medium',  # Encoding speed/quality balance
+                '-crf', '23',  # Quality (lower = better, 23 is default)
+                '-c:a', 'copy',  # Copy audio if present
+                output_path  # Output file
+            ]
+
+            result = subprocess.run(
+                ffmpeg_cmd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            # Remove temp file after successful re-encoding
+            os.remove(temp_output)
+            print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Video successfully re-encoded with H.264")
+
+        except subprocess.CalledProcessError as e:
+            print(f"[MediaPipe] WARNING: FFmpeg re-encoding failed: {e.stderr}")
+            # If re-encoding fails, restore the original file
+            if os.path.exists(temp_output):
+                os.rename(temp_output, output_path)
+            print(f"[MediaPipe] Continuing with original codec")
+        except Exception as e:
+            print(f"[MediaPipe] WARNING: Error during re-encoding: {str(e)}")
+            # Restore original file if something went wrong
+            if os.path.exists(temp_output):
+                os.rename(temp_output, output_path)
 
         # ✅ Make sure the folder exists
         print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Saving landmarks...")
