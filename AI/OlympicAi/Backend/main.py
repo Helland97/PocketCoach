@@ -3,7 +3,7 @@ from typing import Annotated
 from io import BytesIO
 from fastapi import FastAPI, File, UploadFile,  HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse, JSONResponse
-from AI.MediaPipe import MediaPipeVideoProcessor
+from AI.MediaPipe import MediaPipeVideoProcessor, processing_progress
 import tempfile
 
 
@@ -81,7 +81,7 @@ async def process_in_memory(filename: str):
 
 
 @app.get("/verdict", response_class=JSONResponse)
-async def get_verdict(path: str):
+def get_verdict(path: str):
     import time
     start_time = time.time()
     try:
@@ -131,6 +131,13 @@ async def process_video(file: UploadFile = File(...)):
 
 
 # GET ----------------------------------------------------------------------
+
+
+@app.get("/progress", response_class=JSONResponse)
+async def get_progress():
+    """Returns current frame-processing progress as {active, frame, total_frames, percent}."""
+    return processing_progress
+
 
 # 🌐 GET endpoint to serve a basic HTML page that embeds the uploaded video.
 # This can be used to visually test whether the uploaded video is viewable in the browser.

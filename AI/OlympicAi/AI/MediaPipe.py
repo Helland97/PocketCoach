@@ -2,6 +2,7 @@ import os
 import time
 import cv2
 import json
+import time
 import numpy as np
 import mediapipe as mp
 import subprocess
@@ -9,6 +10,8 @@ from Utils.utils.utils import *
 from Utils.counters.exercise_counter import ExerciseCounter
 from Utils.counters.squat_counter import SquatCounter
 
+# Module-level progress state, read by the /progress endpoint in main.py
+processing_progress = {"active": False, "frame": 0, "total_frames": 0, "percent": 0}
 
 
 class MediaPipeVideoProcessor:
@@ -130,7 +133,6 @@ class MediaPipeVideoProcessor:
             all_landmarks (bool): Whether to draw all landmarks or exclude some.
             draw_skeleton (bool): Whether to draw the skeleton at all.
         """
-        import time
         start_time = time.time()
         print(f"[MediaPipe] Starting video processing: {input_path}")
 
@@ -151,6 +153,8 @@ class MediaPipeVideoProcessor:
         fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         print(f"[MediaPipe] Video info: {width}x{height}, {fps} fps, {total_frames} frames")
+
+        processing_progress.update(active=True, frame=0, total_frames=total_frames, percent=0)
 
         # Try H.264 codec first, fall back to mp4v if not available
         print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Setting up video writer...")
@@ -182,8 +186,8 @@ class MediaPipeVideoProcessor:
             static_image_mode=False,         # Use tracking across frames
             model_complexity=2,              # Use the most accurate model
             enable_segmentation=False,       # Skip segmentation unless needed
-            min_detection_confidence=0.7,    # Only accept decent detections
-            min_tracking_confidence=0.7      # Only track when confident
+            min_detection_confidence=0.85,    # Only accept decent detections
+            min_tracking_confidence=0.85      # Only track when confident
         ) as pose:
 
             while True:
@@ -192,6 +196,8 @@ class MediaPipeVideoProcessor:
                     break
 
                 frame_count += 1
+                pct = int(frame_count * 100 // total_frames) if total_frames > 0 else 0
+                processing_progress.update(frame=frame_count, percent=pct)
                 if frame_count % 30 == 0:  # Log every 30 frames
                     print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Processed {frame_count}/{total_frames} frames")
 
@@ -201,10 +207,10 @@ class MediaPipeVideoProcessor:
                 if results.pose_landmarks:
                     frame_landmarks = []
                     for lm in results.pose_landmarks.landmark:
-                        frame_landmarks.append([lm.x, lm.y, lm.z])  # Only x, y, z
+                        frame_landmarks.append([lm.x, lm.y, lm.z, lm.visibility])
 
                     # Convert to NumPy array
-                    frame_landmarks = np.array(frame_landmarks)  # shape: (joints, 3)
+                    frame_landmarks = np.array(frame_landmarks)  # shape: (joints, 4) - x, y, z, visibility
                     landmarks_data.append(frame_landmarks)
 
 
@@ -221,6 +227,8 @@ class MediaPipeVideoProcessor:
                 
             # Convert all frames to a single array: (frames, joints, dimensions)
             landmarks_data = np.stack(landmarks_data)  # shape: (frames, joints, 3)
+
+        processing_progress.update(active=False, frame=total_frames, percent=100)
 
         print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Releasing video resources...")
         cap.release()
@@ -296,12 +304,6 @@ class MediaPipeVideoProcessor:
         """
         #output_path = input_path.replace(".mp4", "_processed.mp4")
         #self.process_video(input_path, output_path, all_landmarks=True, draw_skeleton=True, calculate_angle=True)
-
-        result = counter.get_results()
-        result["video"] = "id"
-        result["path"] = out_path
-        print("Verdict:", counter.get_results())
-        return result
 
         result = counter.get_results()
         result["video"] = "id"

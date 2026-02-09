@@ -10,6 +10,7 @@ export default defineConfig({
       '/api':    { target: 'http://localhost:5246', changeOrigin: true },
       '/videos': { target: 'http://localhost:5246', changeOrigin: true },
       '/view_processed': { target: 'http://localhost:8000', changeOrigin: true },
+      '/progress':       { target: 'http://localhost:8000', changeOrigin: true },
     }
   },
 })
