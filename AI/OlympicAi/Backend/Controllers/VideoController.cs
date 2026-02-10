@@ -10,6 +10,7 @@ using System.Text.Json;
 public interface IAiClientConnect{
     HttpClient AiClient {get;}
     Task<string?> Connect(string path);
+    Task<string?> Analyze(string path, string exerciseType = "heavy_squat", string template = "front_narrow_template.npz");
 }
 
 public class AiClientConnect : IAiClientConnect{
@@ -36,6 +37,22 @@ public class AiClientConnect : IAiClientConnect{
         catch (HttpRequestException e){
             Console.WriteLine("\nException caught");
             Console.WriteLine("Exception message: {0}", e.Message);
+            return null;
+        }
+    }
+
+    public async Task<string?> Analyze(string path, string exerciseType = "heavy_squat", string template = "front_narrow_template.npz"){
+        try{
+            var url = $"{_pythonBackendUrl}/analyze?path={Uri.EscapeDataString(path)}&exercise_type={exerciseType}&template={template}";
+            Console.WriteLine($"[.NET] Calling analyze endpoint: {url}");
+            using HttpResponseMessage response = await AiClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            string responseBody = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[.NET] Analyze response received");
+            return responseBody;
+        }
+        catch (HttpRequestException e){
+            Console.WriteLine($"[.NET] Analyze exception: {e.Message}");
             return null;
         }
     }
@@ -170,12 +187,30 @@ public class VideoController : ControllerBase{
                 return StatusCode(verdict?.StatusCode ?? 500, errorMsg);
             }
 
+            // 3. Run DTW analysis on the generated landmarks
+            var analyzeStart = DateTime.Now;
+            Console.WriteLine($"[.NET] Calling Python backend for DTW analysis...");
+            string? analysis = await AiClient.Analyze(videoReference.Path);
+            var analyzeTime = (DateTime.Now - analyzeStart).TotalSeconds;
+            Console.WriteLine($"[.NET] DTW analysis completed in {analyzeTime:F2}s");
+
             var totalTime = (DateTime.Now - startTime).TotalSeconds;
             Console.WriteLine($"[.NET] Total UploadAndVerdict time: {totalTime:F2}s");
-            Console.WriteLine($"[.NET] Verdict: {verdict.Value}");
 
-            // 3. Return verdict (deletion will be handled by frontend when needed)
-            return verdict?.Value != null ? Ok(verdict.Value) : StatusCode(500, "Verdict is null");
+            // 4. Merge MediaPipe verdict with DTW analysis and return
+            // Parse both JSON results and combine them
+            string verdictJson = verdict?.Value?.ToString() ?? "{}";
+            string analysisJson = analysis ?? "{}";
+
+            var verdictObj = JsonSerializer.Deserialize<JsonElement>(verdictJson);
+            var analysisObj = JsonSerializer.Deserialize<JsonElement>(analysisJson);
+
+            var combined = new {
+                mediapipe = verdictObj,
+                analysis = analysisObj
+            };
+
+            return Ok(JsonSerializer.Serialize(combined));
         } catch (Exception ex) {
             var totalTime = (DateTime.Now - startTime).TotalSeconds;
             Console.WriteLine($"[.NET] Error in UploadAndVerdict after {totalTime:F2}s: {ex.Message}");

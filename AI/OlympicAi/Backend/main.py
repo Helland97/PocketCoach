@@ -4,6 +4,8 @@ from io import BytesIO
 from fastapi import FastAPI, File, UploadFile,  HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse, JSONResponse
 from AI.MediaPipe import MediaPipeVideoProcessor, processing_progress
+from AI.process_landmarks.verdict import analyze_user_video
+import numpy as np
 import tempfile
 
 
@@ -107,6 +109,52 @@ def get_verdict(path: str):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analyze", response_class=JSONResponse)
+def analyze_landmarks(path: str, exercise_type: str = "heavy_squat",
+                      template: str = "front_narrow_template.npz"):
+    """
+    Runs after /verdict. Takes the same video path, loads the landmarks
+    that MediaPipe saved, creates an embedding, runs DTW analysis against
+    the chosen template, and returns the verdict.
+    """
+    import time
+    start_time = time.time()
+    try:
+        # Derive landmarks path from the video path (same logic as MediaPipe.py)
+        base_name = os.path.splitext(os.path.basename(path))[0]
+        landmarks_path = os.path.join("AI/MediaPipe_landmarks", base_name + "_landmarks.npy")
+        template_path = os.path.join("AI/templates", template)
+
+        print(f"[Analyze] Received request - video: {path}")
+        print(f"[Analyze] Landmarks: {landmarks_path}")
+        print(f"[Analyze] Template: {template_path}")
+        print(f"[Analyze] Exercise type: {exercise_type}")
+
+        if not os.path.exists(landmarks_path):
+            raise HTTPException(status_code=404,
+                                detail=f"Landmarks not found: {landmarks_path}")
+        if not os.path.exists(template_path):
+            raise HTTPException(status_code=404,
+                                detail=f"Template not found: {template_path}")
+
+        landmarks = np.load(landmarks_path)
+        print(f"[Analyze] [{time.time()-start_time:.2f}s] Loaded landmarks: {landmarks.shape}")
+
+        result = analyze_user_video(landmarks, template_path, exercise_type)
+
+        print(f"[Analyze] [{time.time()-start_time:.2f}s] Analysis complete. "
+              f"{result['n_reps']} reps, avg similarity: {result['average_core_similarity']:.2%}")
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[Analyze] ERROR after {time.time()-start_time:.2f}s: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/process_video/")
 async def process_video(file: UploadFile = File(...)):

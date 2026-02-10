@@ -11,6 +11,85 @@ type Video = {
 type Exercise = "back_squat" | "front_squat" | "deadlift" | "benchpress" | "military_press";
 type CameraAngle = "front" | "back" | "left_side" | "right_side" | "45_front_left" | "45_front_right";
 
+type FeatureResult = {
+    feature: string;
+    correlation: number;
+    mae_degrees: number;
+    combined_score: number;
+    is_core: boolean;
+};
+
+type RepResult = {
+    rep_number: number;
+    core_similarity: number;
+    depth_score: number;
+    user_flexion: number;
+    template_flexion: number;
+    hit_parallel: boolean;
+    per_feature: FeatureResult[];
+    feedback: string;
+};
+
+type AnalysisResult = {
+    n_reps: number;
+    average_core_similarity: number;
+    average_depth_score: number;
+    reps: RepResult[];
+};
+
+function gradeFor(score: number): { letter: string; className: string } {
+    if (score > 0.80) return { letter: "A", className: "gradeA" };
+    if (score > 0.60) return { letter: "B", className: "gradeB" };
+    if (score > 0.40) return { letter: "C", className: "gradeC" };
+    if (score > 0.20) return { letter: "D", className: "gradeD" };
+    return { letter: "F", className: "gradeF" };
+}
+
+function formatFeatureName(name: string): string {
+    return name
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function getImprovementTips(rep: RepResult): string[] {
+    const tips: string[] = [];
+
+    const problemFeatures = rep.per_feature
+        .filter(f => f.is_core && f.combined_score < 0.80)
+        .sort((a, b) => a.combined_score - b.combined_score);
+
+    for (const f of problemFeatures) {
+        const name = f.feature.toLowerCase();
+        if (name.includes("knee")) {
+            if (f.mae_degrees > 15) {
+                tips.push(`Your knee angle differs significantly (${f.mae_degrees.toFixed(1)}° off). Focus on controlling squat depth and keeping a consistent knee bend throughout the movement.`);
+            } else {
+                tips.push(`Knee tracking is slightly off (${f.mae_degrees.toFixed(1)}° off). Focus on pushing your knees over your toes and maintaining alignment.`);
+            }
+        } else if (name.includes("hip")) {
+            tips.push(`Hip hinge pattern differs from the template (${f.mae_degrees.toFixed(1)}° off). Practice hip mobility and focus on initiating the movement by pushing your hips back.`);
+        } else if (name.includes("trunk")) {
+            tips.push(`Trunk angle is off by ${f.mae_degrees.toFixed(1)}°. Focus on keeping your chest up and maintaining a neutral spine throughout the lift.`);
+        } else {
+            tips.push(`${formatFeatureName(f.feature)} movement pattern differs (${f.mae_degrees.toFixed(1)}° off). Try to match the pro's range of motion more closely.`);
+        }
+    }
+
+    if (!rep.hit_parallel) {
+        tips.push("You did not hit parallel on this rep. Try to squat deeper by working on hip and ankle mobility.");
+    }
+
+    if (rep.depth_score < 80) {
+        tips.push(`Depth score is ${Math.round(rep.depth_score)}/100. The pro template goes deeper — focus on increasing your range of motion gradually.`);
+    }
+
+    if (tips.length === 0) {
+        tips.push("Great form on this rep! Keep up the consistent technique.");
+    }
+
+    return tips;
+}
+
 const EXERCISES: { value: Exercise; label: string }[] = [
     { value: "back_squat", label: "Back Squat" },
     { value: "front_squat", label: "Front Squat" },
@@ -38,6 +117,8 @@ export default function App() {
     const [busy, setBusy] = useState(false);
     const [analyzing, setAnalyzing] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+    const [expandedReps, setExpandedReps] = useState<Set<number>>(new Set());
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Poll /progress every 500ms while analyzing
@@ -83,6 +164,8 @@ export default function App() {
             setVideo(null);
             setVideoUrl(undefined);
             setProcessedVideoPath(null);
+            setAnalysis(null);
+            setExpandedReps(new Set());
             setError(null);
         }
     }
@@ -114,6 +197,8 @@ export default function App() {
         const fileUrl = URL.createObjectURL(file);
         setVideoUrl(fileUrl);
         setProcessedVideoPath(null);
+        setAnalysis(null);
+        setExpandedReps(new Set());
 
         const fd = new FormData();
         fd.append("video", file);
@@ -157,12 +242,18 @@ export default function App() {
                 if (!res.ok) throw new Error(await res.text());
                 const text = await res.text();
 
-                // Parse verdict to get processed video path
-                const verdictData = JSON.parse(text);
-                if (verdictData.path) {
-                    setProcessedVideoPath(verdictData.path);
-                    // Update video URL to point to processed video (relative URL works in both dev and production)
-                    setVideoUrl(`/view_processed/${encodeURIComponent(verdictData.path)}`);
+                // Parse combined response: { mediapipe: {...}, analysis: {...} }
+                const combined = JSON.parse(text);
+                const mediapipe = combined.mediapipe;
+                const analysisData = combined.analysis;
+
+                if (mediapipe?.path) {
+                    setProcessedVideoPath(mediapipe.path);
+                    setVideoUrl(`/view_processed/${encodeURIComponent(mediapipe.path)}`);
+                }
+
+                if (analysisData?.n_reps != null) {
+                    setAnalysis(analysisData);
                 }
             }
             else{
@@ -348,6 +439,151 @@ export default function App() {
                                     ) : null}
                                 </div>
                             </div>
+
+                            {/* Verdict Display */}
+                            {analysis && (
+                                <div className={styles.verdictContainer}>
+                                    <h3 className={styles.verdictTitle}>Analysis Results</h3>
+
+                                    {/* Overall Summary */}
+                                    <div className={styles.summaryRow}>
+                                        <div className={styles.summaryCard}>
+                                            <span className={styles.summaryValue}>
+                                                {Math.round(analysis.average_core_similarity * 100)}%
+                                            </span>
+                                            <span className={styles.summaryLabel}>Core Similarity</span>
+                                        </div>
+                                        <div className={styles.summaryCard}>
+                                            <span className={styles.summaryValue}>
+                                                {Math.round(analysis.average_depth_score)}/100
+                                            </span>
+                                            <span className={styles.summaryLabel}>Depth Score</span>
+                                        </div>
+                                        <div className={styles.summaryCard}>
+                                            <span className={styles.summaryValue}>{analysis.n_reps}</span>
+                                            <span className={styles.summaryLabel}>Reps Detected</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Per-Rep Breakdown */}
+                                    {analysis.reps.map((rep) => {
+                                        const coreGrade = gradeFor(rep.core_similarity);
+                                        const isExpanded = expandedReps.has(rep.rep_number);
+                                        const tips = getImprovementTips(rep);
+                                        return (
+                                            <div key={rep.rep_number} className={styles.repCard}>
+                                                <div className={styles.repHeader}>
+                                                    <span className={styles.repTitle}>Rep {rep.rep_number}</span>
+                                                    <span className={`${styles.repGrade} ${styles[coreGrade.className]}`}>
+                                                        {coreGrade.letter}
+                                                    </span>
+                                                </div>
+
+                                                <div className={styles.repStats}>
+                                                    <span>Similarity: {Math.round(rep.core_similarity * 100)}%</span>
+                                                    <span>Depth: {Math.round(rep.depth_score)}/100</span>
+                                                    <span>Parallel: {rep.hit_parallel ? "Yes" : "No"}</span>
+                                                </div>
+
+                                                {/* Core features table */}
+                                                <table className={styles.featureTable}>
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Joint</th>
+                                                            <th>Score</th>
+                                                            <th>Grade</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {rep.per_feature
+                                                            .filter(f => f.is_core)
+                                                            .map(f => {
+                                                                const g = gradeFor(f.combined_score);
+                                                                return (
+                                                                    <tr key={f.feature}>
+                                                                        <td>{formatFeatureName(f.feature)}</td>
+                                                                        <td>{Math.round(f.combined_score * 100)}%</td>
+                                                                        <td><span className={`${styles.badge} ${styles[g.className]}`}>{g.letter}</span></td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                    </tbody>
+                                                </table>
+
+                                                {/* Expand / Collapse button */}
+                                                <button
+                                                    className={styles.detailToggle}
+                                                    onClick={() => setExpandedReps(prev => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(rep.rep_number)) next.delete(rep.rep_number);
+                                                        else next.add(rep.rep_number);
+                                                        return next;
+                                                    })}
+                                                >
+                                                    <svg
+                                                        className={`${styles.detailToggleIcon} ${isExpanded ? styles.detailToggleIconOpen : ""}`}
+                                                        width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                    >
+                                                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                    {isExpanded ? "Hide Details" : "In-Depth Analysis"}
+                                                </button>
+
+                                                {/* Expanded detail section */}
+                                                {isExpanded && (
+                                                    <div className={styles.detailSection}>
+                                                        {/* Improvement tips */}
+                                                        <div className={styles.tipsContainer}>
+                                                            <h4 className={styles.tipsTitle}>What to Improve</h4>
+                                                            <ul className={styles.tipsList}>
+                                                                {tips.map((tip, idx) => (
+                                                                    <li key={idx} className={styles.tipItem}>{tip}</li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+
+                                                        {/* Full feature breakdown */}
+                                                        <h4 className={styles.detailSubtitle}>All Joint Metrics</h4>
+                                                        <table className={styles.featureTable}>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Joint</th>
+                                                                    <th>Score</th>
+                                                                    <th>MAE</th>
+                                                                    <th>Grade</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {rep.per_feature.map(f => {
+                                                                    const g = gradeFor(f.combined_score);
+                                                                    return (
+                                                                        <tr key={f.feature} className={f.is_core ? styles.coreRow : ""}>
+                                                                            <td>
+                                                                                {formatFeatureName(f.feature)}
+                                                                                {f.is_core && <span className={styles.coreTag}>core</span>}
+                                                                            </td>
+                                                                            <td>{Math.round(f.combined_score * 100)}%</td>
+                                                                            <td>{f.mae_degrees.toFixed(1)}°</td>
+                                                                            <td><span className={`${styles.badge} ${styles[g.className]}`}>{g.letter}</span></td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+
+                                                        {/* Depth comparison */}
+                                                        <div className={styles.depthComparison}>
+                                                            <span>Your max flexion: <strong>{rep.user_flexion.toFixed(1)}°</strong></span>
+                                                            <span>Pro template: <strong>{rep.template_flexion.toFixed(1)}°</strong></span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
                 </>
