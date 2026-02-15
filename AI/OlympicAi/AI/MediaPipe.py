@@ -226,6 +226,18 @@ class MediaPipeVideoProcessor:
                 out.write(frame)
                 
             # Convert all frames to a single array: (frames, joints, dimensions)
+            if len(landmarks_data) == 0:
+                processing_progress.update(active=False, frame=total_frames, percent=100)
+                cap.release()
+                out.release()
+                raise ValueError(
+                    f"MediaPipe could not detect a pose in any of the {frame_count} frames. "
+                    f"This can happen if the person is too far away, the lighting is poor, "
+                    f"or the video quality is too low. Try a different video."
+                )
+
+            detected_ratio = len(landmarks_data) / frame_count if frame_count > 0 else 0
+            print(f"[MediaPipe] Pose detected in {len(landmarks_data)}/{frame_count} frames ({detected_ratio:.0%})")
             landmarks_data = np.stack(landmarks_data)  # shape: (frames, joints, 3)
 
         processing_progress.update(active=False, frame=total_frames, percent=100)

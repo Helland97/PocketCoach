@@ -440,6 +440,43 @@ export default function App() {
                                 </div>
                             </div>
 
+                            {/* Analysis Error */}
+                            {!analysis && error && (
+                                <div className={styles.analysisError}>
+                                    <div className={styles.analysisErrorIcon}>
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                                            <path d="M12 8V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                            <circle cx="12" cy="16.5" r="1" fill="currentColor"/>
+                                        </svg>
+                                    </div>
+                                    <h3 className={styles.analysisErrorTitle}>Analysis Failed</h3>
+                                    <p className={styles.analysisErrorMessage}>
+                                        {error.toLowerCase().includes("pose") || error.toLowerCase().includes("landmark")
+                                            ? "We couldn't detect a person in this video. The AI was unable to track body landmarks in any of the frames."
+                                            : error.toLowerCase().includes("no reps") || error.toLowerCase().includes("n_reps")
+                                            ? "No repetitions were detected in this video. Make sure the full exercise movement is visible."
+                                            : "Something went wrong while analyzing your video."}
+                                    </p>
+                                    <div className={styles.analysisErrorTips}>
+                                        <p className={styles.analysisErrorTipsLabel}>Tips for a better result:</p>
+                                        <ul>
+                                            <li>Make sure your full body is visible in the frame</li>
+                                            <li>Use good lighting so the camera can see you clearly</li>
+                                            <li>Avoid busy or cluttered backgrounds</li>
+                                            <li>Keep the camera steady and at a reasonable distance</li>
+                                        </ul>
+                                    </div>
+                                    <button
+                                        className={styles.button}
+                                        onClick={() => { setError(null); setProcessedVideoPath(null); }}
+                                        style={{ marginTop: "0.5rem" }}
+                                    >
+                                        Try Another Video
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Verdict Display */}
                             {analysis && (
                                 <div className={styles.verdictContainer}>
@@ -589,7 +626,7 @@ export default function App() {
                 </>
             )}
 
-            {error && (
+            {error && !video && (
                 <div className={styles.errorContainer}>
                     <svg className={styles.errorIcon} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
