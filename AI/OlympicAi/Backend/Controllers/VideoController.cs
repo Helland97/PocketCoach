@@ -1,6 +1,7 @@
 namespace AI_spotter.Controllers;
 
 using AI_spotter.Models;
+using AI_spotter.Data;
 using AI_spotter.Services;
 using Microsoft.AspNetCore.Mvc;
 using AI_spotter.PublicClasses;
@@ -62,10 +63,12 @@ public class AiClientConnect : IAiClientConnect{
 [Route("[controller]")]
 public class VideoController : ControllerBase{
     private readonly IAiClientConnect AiClient;
+    private readonly AppDbContext _db;
     UploadHandler handleHerVideo = new UploadHandler();
 
-    public VideoController(IAiClientConnect aiClient){
+    public VideoController(IAiClientConnect aiClient, AppDbContext db){
         AiClient = aiClient;
+        _db = db;
     }
 
 
@@ -152,10 +155,13 @@ public class VideoController : ControllerBase{
     }
 
     [HttpPost("upload")]
-    public async Task<IActionResult> UploadAndVerdict(IFormFile video){
+    public async Task<IActionResult> UploadAndVerdict(
+        IFormFile video,
+        [FromForm] string exercise = "heavy_squat",
+        [FromForm] string camera_angle = "front_narrow"){
         var startTime = DateTime.Now;
         try {
-            Console.WriteLine($"[.NET] Starting UploadAndVerdict");
+            Console.WriteLine($"[.NET] Starting UploadAndVerdict (exercise={exercise}, camera={camera_angle})");
 
             // 1. Upload the video
             var uploadStart = DateTime.Now;
@@ -174,7 +180,7 @@ public class VideoController : ControllerBase{
 
             Console.WriteLine($"[.NET] Uploaded video path: {videoReference.Path}");
 
-            // 2. Retrieve verdict
+            // 2. Retrieve verdict (MediaPipe pose estimation)
             var aiStart = DateTime.Now;
             Console.WriteLine($"[.NET] Calling Python backend for AI processing...");
             var verdict = await this.GetAI("", videoReference.Id) as ObjectResult;
@@ -197,17 +203,32 @@ public class VideoController : ControllerBase{
             var totalTime = (DateTime.Now - startTime).TotalSeconds;
             Console.WriteLine($"[.NET] Total UploadAndVerdict time: {totalTime:F2}s");
 
-            // 4. Merge MediaPipe verdict with DTW analysis and return
-            // Parse both JSON results and combine them
+            // 4. Parse results
             string verdictJson = verdict?.Value?.ToString() ?? "{}";
             string analysisJson = analysis ?? "{}";
 
             var verdictObj = JsonSerializer.Deserialize<JsonElement>(verdictJson);
             var analysisObj = JsonSerializer.Deserialize<JsonElement>(analysisJson);
 
+            // 5. Persist to SQLite database
+            try {
+                await PersistToDatabase(videoReference, exercise, camera_angle, analysisObj);
+            } catch (Exception dbEx) {
+                Console.WriteLine($"[.NET] Database save warning: {dbEx.Message}");
+                // Don't fail the request if DB save fails — still return results
+            }
+
+            // 6. Strip embedding fields from response (frontend doesn't need them)
+            var analysisDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(analysisJson)
+                ?? new Dictionary<string, JsonElement>();
+            analysisDict.Remove("embedding_base64");
+            analysisDict.Remove("embedding_shape");
+            analysisDict.Remove("embedding_feature_names");
+            analysisDict.Remove("landmarks_shape");
+
             var combined = new {
                 mediapipe = verdictObj,
-                analysis = analysisObj
+                analysis = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(analysisDict))
             };
 
             return Ok(JsonSerializer.Serialize(combined));
@@ -217,6 +238,94 @@ public class VideoController : ControllerBase{
             Console.WriteLine($"[.NET] Stack trace: {ex.StackTrace}");
             return StatusCode(500, $"Error: {ex.Message}");
         }
+    }
+
+    private async Task PersistToDatabase(Video videoReference, string exercise, string cameraAngle, JsonElement analysisObj)
+    {
+        // Read raw landmark .npy file from the shared volume
+        var baseName = Path.GetFileNameWithoutExtension(videoReference.Name);
+        var landmarkPath = Path.Combine("/app/Landmarks", baseName + "_landmarks.npy");
+
+        byte[] landmarkBytes = [];
+        string landmarkShape = "";
+        if (System.IO.File.Exists(landmarkPath))
+        {
+            landmarkBytes = await System.IO.File.ReadAllBytesAsync(landmarkPath);
+            Console.WriteLine($"[.NET] Read landmark file: {landmarkPath} ({landmarkBytes.Length} bytes)");
+        }
+        else
+        {
+            Console.WriteLine($"[.NET] Landmark file not found: {landmarkPath}");
+        }
+        if (analysisObj.TryGetProperty("landmarks_shape", out var lmShape))
+        {
+            landmarkShape = lmShape.GetString() ?? "";
+        }
+
+        // Extract embedding from analysis response
+        byte[] embeddingBytes = [];
+        string embeddingShape = "";
+        string featureNames = "";
+        if (analysisObj.TryGetProperty("embedding_base64", out var embB64))
+        {
+            embeddingBytes = Convert.FromBase64String(embB64.GetString() ?? "");
+        }
+        if (analysisObj.TryGetProperty("embedding_shape", out var embShape))
+        {
+            embeddingShape = embShape.GetString() ?? "";
+        }
+        if (analysisObj.TryGetProperty("embedding_feature_names", out var embNames))
+        {
+            featureNames = embNames.GetString() ?? "";
+        }
+
+        // Get rep count from analysis
+        int nReps = 0;
+        if (analysisObj.TryGetProperty("n_reps", out var nRepsEl))
+        {
+            nReps = nRepsEl.GetInt32();
+        }
+
+        // Build comparison result JSON (strip embedding fields)
+        var comparisonDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(analysisObj.GetRawText())
+            ?? new Dictionary<string, JsonElement>();
+        comparisonDict.Remove("embedding_base64");
+        comparisonDict.Remove("embedding_shape");
+        comparisonDict.Remove("embedding_feature_names");
+        comparisonDict.Remove("landmarks_shape");
+        string comparisonJson = JsonSerializer.Serialize(comparisonDict);
+
+        // Create entities
+        var session = new Session
+        {
+            ExerciseType = exercise,
+            CameraAngle = cameraAngle,
+            NReps = nReps,
+            CreatedAt = DateTime.UtcNow.ToString("o")
+        };
+
+        var landmark = new LandmarkData
+        {
+            Data = landmarkBytes,
+            Shape = landmarkShape,
+            Session = session
+        };
+
+        var analysisEntity = new Analysis
+        {
+            BiomechanicalData = embeddingBytes,
+            BiomechanicalShape = embeddingShape,
+            FeatureNames = featureNames,
+            ComparisonResult = comparisonJson,
+            Session = session
+        };
+
+        _db.Sessions.Add(session);
+        _db.Landmarks.Add(landmark);
+        _db.Analyses.Add(analysisEntity);
+        await _db.SaveChangesAsync();
+
+        Console.WriteLine($"[.NET] Saved session {session.Id} to database (exercise={exercise}, reps={nReps})");
     }
 
     [HttpPost("cleanup")]

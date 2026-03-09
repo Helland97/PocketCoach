@@ -1,4 +1,6 @@
 import os
+import base64
+import json
 from typing import Annotated
 from io import BytesIO
 from fastapi import FastAPI, File, UploadFile,  HTTPException
@@ -143,8 +145,19 @@ def analyze_landmarks(path: str, exercise_type: str = "heavy_squat",
 
         result = analyze_user_video(landmarks, template_path, exercise_type)
 
+        # Extract the embedding numpy array, encode as base64 for JSON transport
+        embedding = result.pop('embedding')
+        emb_feature_names = result.pop('embedding_feature_names')
+
+        emb_bytes = embedding.astype(np.float64).tobytes()
+        result['embedding_base64'] = base64.b64encode(emb_bytes).decode('ascii')
+        result['embedding_shape'] = ','.join(str(d) for d in embedding.shape)
+        result['embedding_feature_names'] = json.dumps(emb_feature_names)
+        result['landmarks_shape'] = ','.join(str(d) for d in landmarks.shape)
+
         print(f"[Analyze] [{time.time()-start_time:.2f}s] Analysis complete. "
-              f"{result['n_reps']} reps, avg similarity: {result['average_core_similarity']:.2%}")
+              f"{result['n_reps']} reps, avg similarity: {result['average_core_similarity']:.2%}, "
+              f"embedding shape: {embedding.shape}")
         return result
 
     except HTTPException:

@@ -20,8 +20,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 
 WORKDIR /app
 
-# Create directories for video storage
-RUN mkdir -p Videos ProcessedVideos
+# Create directories for video storage and database
+RUN mkdir -p Videos ProcessedVideos Data Landmarks
 
 # Copy published app
 COPY --from=publish /app/publish .

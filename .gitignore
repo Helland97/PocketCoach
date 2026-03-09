@@ -51,6 +51,11 @@ obj/
 **/obj/
 *.sln
 
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+
 # ========================================
 # Media files (video)
 # ========================================

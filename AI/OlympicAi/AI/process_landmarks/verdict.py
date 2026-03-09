@@ -9,6 +9,7 @@ from Utils.utils.utils import (
 )
 from AI.process_landmarks.exercise_config import EXERCISE_CONFIGS, CORE_FEATURES
 from AI.process_landmarks.create_template import load_template
+from AI.process_landmarks.create_embedding import build_embedding
 from AI.process_landmarks.dtw_analysis import compare_rep_to_template
 
 
@@ -96,6 +97,9 @@ def analyze_user_video(landmarks, template_path, exercise_type='heavy_squat'):
     angles = compute_angle_features_2d(lm)
     smooth = smooth_angles(angles)
 
+    # Build the biomechanical embedding (angles + velocity + symmetry + depth)
+    embedding, emb_feature_names = build_embedding(smooth, lm)
+
     exercise_config = EXERCISE_CONFIGS[exercise_type]
     reps, _ = find_rep_boundaries(smooth, exercise_config)
     reps_data = extract_rep_angles(smooth, reps)
@@ -124,4 +128,6 @@ def analyze_user_video(landmarks, template_path, exercise_type='heavy_squat'):
         'average_core_similarity': float(avg_core),
         'average_depth_score': float(avg_depth),
         'reps': results,
+        'embedding': embedding,
+        'embedding_feature_names': emb_feature_names,
     }

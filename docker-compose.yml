@@ -26,6 +26,8 @@ services:
     volumes:
       - video-storage:/app/Videos
       - processed-storage:/app/ProcessedVideos
+      - sqlite-data:/app/Data
+      - landmarks-storage:/app/Landmarks:ro
     depends_on:
       - python-backend
     networks:
@@ -64,3 +66,4 @@ volumes:
   video-storage:
   processed-storage:
   landmarks-storage:
+  sqlite-data:
