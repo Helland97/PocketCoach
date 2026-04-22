@@ -102,10 +102,10 @@ docker-compose ps
 ```bash
 # Terminal 1 - Python backend
 cd AI
-uvicorn backend.main:app --reload
+uvicorn api.main:app --reload
 
 # Terminal 2 - .NET backend
-cd AI/backend
+cd Backend
 dotnet run
 
 # Terminal 3 - Frontend

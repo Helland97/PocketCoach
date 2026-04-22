@@ -21,7 +21,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy Python modules (flat structure after OlympicAi removal)
+# Copy Python modules
 COPY MediaPipe.py ./
 COPY process_landmarks/ ./process_landmarks/
 COPY mlp/ ./mlp/
@@ -30,11 +30,11 @@ COPY templates/ ./templates/
 # Copy the Utils module (required by MediaPipe)
 COPY Utils/ ./Utils/
 
-# Copy the backend module (main.py)
-COPY backend/main.py ./backend/
+# Copy the FastAPI app (uvicorn entry point)
+COPY api/ ./api/
 
 # Create necessary directories
-RUN mkdir -p Videos ProcessedVideos MediaPipe_landmarks backend
+RUN mkdir -p Videos ProcessedVideos MediaPipe_landmarks
 
 # Expose port
 EXPOSE 8000
@@ -43,4 +43,4 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 
 # Run the FastAPI application
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

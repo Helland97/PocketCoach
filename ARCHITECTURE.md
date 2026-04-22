@@ -9,7 +9,7 @@ Deep documentation of every file, folder, and module in the AI Spotter project.
 1. [Project Overview](#project-overview)
 2. [Root Directory](#root-directory)
 3. [Frontend (`frontend/`)](#frontend)
-4. [.NET API Gateway (`AI/backend/`)](#net-api-gateway)
+4. [.NET API Gateway (`Backend/`)](#net-api-gateway)
 5. [Python AI Backend (`AI/`)](#python-ai-backend)
 6. [AI Processing Pipeline (`AI/`)](#ai-processing-pipeline)
 7. [Utilities (`AI/Utils/`)](#utilities)
@@ -46,14 +46,14 @@ TempAISpotter/
 +-- docker-compose.yml
 +-- package.json
 +-- package-lock.json
-+-- AI/
-|   +-- AI/ Python + .NET backends
++-- AI/                       # Python AI processing (FastAPI + MediaPipe)
++-- Backend/                  # .NET API gateway (ASP.NET Core 9)
 +-- frontend/                 # React frontend
 ```
 
 ### `.gitignore`
 
-Ignores Python virtualenvs, `__pycache__`, `node_modules`, IDE files, .NET `bin/`/`obj/`, and all video files (`*.mp4`, `*.mov`, `*.avi`, `*.mkv`). Also ignores `AI/backend/Videos/`.
+Ignores Python virtualenvs, `__pycache__`, `node_modules`, IDE files, .NET `bin/`/`obj/`, and all video files (`*.mp4`, `*.mov`, `*.avi`, `*.mkv`). Also ignores `Backend/Videos/`.
 
 ### `package.json` (root)
 
@@ -180,7 +180,7 @@ Two-stage build:
 ## .NET API Gateway
 
 ```
-AI/backend/
+Backend/
 +-- AI-spotter.csproj         # .NET 9 project file
 +-- AI-spotter.http           # HTTP test file (for VS REST Client)
 +-- Program.cs                # Application entry point
@@ -308,17 +308,24 @@ Three-stage build:
 
 ```
 AI/
-+-- .gitignore                # Ignores videos/, ProcessedVideos/, landmarks, embeddings, templates
++-- .dockerignore             # Python-specific docker ignores
 +-- Dockerfile.python         # Python 3.11-slim + system deps + pip install
-+-- # .sln file removed in refactor             # Visual Studio solution file (references backend/AI-spotter.csproj)
 +-- README.md                 # Python backend documentation
 +-- requirements.txt          # Python dependencies
 +-- test.py                   # End-to-end test script
 +-- test_embeddings.py        # Embeddings/DTW test script
-+-- AI/                       # AI processing modules
++-- api/                      # FastAPI entry point (uvicorn api.main:app)
+|   +-- main.py
++-- MediaPipe.py              # MediaPipe pose estimation
++-- process_landmarks/        # DTW + model orchestration
++-- mlp/                      # VAE model alternatives (Stats, LSTM, LSTM+Attention)
++-- Model_research_notebooks/ # Jupyter notebooks for model research
++-- templates/                # Pro reference templates (.npz)
++-- MediaPipe_landmarks/      # Saved landmark data (.npy, runtime)
++-- embedding/                # Computed embeddings (runtime)
++-- training_data/            # User-provided training videos (runtime)
 +-- Utils/                    # Shared utility modules
-+-- backend/                  # .NET API gateway (see above)
-+-- ProcessedVideos/          # Output videos with skeleton overlay
++-- ProcessedVideos/          # Output videos with skeleton overlay (runtime)
 +-- videos/                   # Source test videos
 ```
 
@@ -337,7 +344,7 @@ dtw-python==1.5.3
 pydantic==2.11.7
 ```
 
-### `backend/main.py` (FastAPI Application)
+### `api/main.py` (FastAPI Application)
 
 The Python FastAPI server. All endpoints:
 
@@ -384,9 +391,9 @@ Standalone DTW analysis test. Lists available landmark and template files, selec
 Single-stage build on `python:3.11-slim`:
 1. Installs system dependencies: `libgl1`, `libglib2.0-0`, `libgomp1`, `ffmpeg`, `libx264-dev`, `libsm6`, `libxext6`, `libxrender1`
 2. Installs Python packages from `requirements.txt`
-3. Copies `AI/`, `Utils/`, and `backend/main.py`
+3. Copies `AI/`, `Utils/`, and `api/main.py`
 4. Creates `Videos/`, `ProcessedVideos/`, `MediaPipe_landmarks/` directories
-5. Runs `uvicorn backend.main:app --host 0.0.0.0 --port 8000`
+5. Runs `uvicorn api.main:app --host 0.0.0.0 --port 8000`
 
 ---
 

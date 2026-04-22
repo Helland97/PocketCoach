@@ -80,9 +80,15 @@ obj/
 .env*.local
 
 # ========================================
-# Generated / volume-mounted directories under AI/
+# Generated / volume-mounted directories
 # (Folders themselves are tracked via a .gitignore inside each;
-#  all content within them is ignored.)
+#  all content within them is ignored. See:
+#    AI/MediaPipe_landmarks/.gitignore
+#    AI/ProcessedVideos/.gitignore
+#    AI/embedding/.gitignore
+#    AI/videos/.gitignore
+#    Backend/Videos/.gitignore
+# )
 # ========================================
 AI/.conda/
 

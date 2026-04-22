@@ -1,12 +1,6 @@
 # ============================================================
-# .NET .dockerignore for the dotnet-backend build context (./AI/backend)
+# .NET .dockerignore for the dotnet-backend build context (./Backend)
 # ============================================================
-
-# Python files (this directory is shared with the Python build — not needed for the .NET image)
-main.py
-__pycache__/
-*.py[cod]
-*.so
 
 # .NET build artifacts
 bin/
@@ -32,6 +26,11 @@ Data/*.db-wal
 *.db
 *.db-shm
 *.db-wal
+
+# Any stray Python caches (shouldn't exist but safe guard)
+__pycache__/
+*.py[cod]
+*.so
 
 # OS / IDE files
 .DS_Store

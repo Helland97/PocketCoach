@@ -15,7 +15,7 @@ services:
   # .NET Backend - API Gateway
   dotnet-backend:
     build:
-      context: ./AI/backend
+      context: ./Backend
       dockerfile: Dockerfile.dotnet
     ports:
       - "5246:8080"

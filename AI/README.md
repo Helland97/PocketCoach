@@ -60,6 +60,6 @@ Potentially a temporary folder. Will be used to store videos for either training
 
 # How to start FastAPI localhost
 
-Run the following command in powershell given that you have the necessary libraries. The following prompt is based on if you are in the "OlympicAI" folder:
+Run the following command in powershell given that you have the necessary libraries. The following prompt is based on if you are in the "AI" folder:
 
-uvicorn backend.main:app --reload 
+uvicorn api.main:app --reload 

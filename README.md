@@ -120,13 +120,13 @@ venv\Scripts\activate
 source venv/bin/activate
 
 pip install -r requirements.txt
-uvicorn backend.main:app --reload
+uvicorn api.main:app --reload
 ```
 
 ### Terminal 2 - .NET Backend
 
 ```bash
-cd AI/backend
+cd Backend
 dotnet run
 ```
 
@@ -179,30 +179,43 @@ Then rebuild: `docker-compose build frontend && docker-compose up -d frontend`
 
 ```
 TempAISpotter/
-+-- docker-compose.yml          # Container orchestration
-+-- frontend/                   # React + TypeScript + Vite
-|   +-- src/App.tsx             # Main UI component
-|   +-- nginx.conf              # Reverse proxy config
++-- docker-compose.yml              # Container orchestration
++-- frontend/                       # React + TypeScript + Vite
+|   +-- src/App.tsx                 # Main UI component
+|   +-- nginx.conf                  # Reverse proxy config
 |   +-- Dockerfile
-+-- AI/
-|   +-- AI/
-|   |   +-- MediaPipe.py        # Pose estimation processor
-|   |   +-- process_landmarks/
-|   |   |   +-- exercise_config.py   # Exercise definitions
-|   |   |   +-- create_template.py   # Template builder
-|   |   |   +-- create_embedding.py  # Embedding pipeline
-|   |   |   +-- dtw_analysis.py      # DTW comparison
-|   |   |   +-- verdict.py           # Feedback generator
-|   |   +-- templates/          # Pro reference templates (.npz)
-|   |   +-- MediaPipe_landmarks/# Saved landmark data (.npy)
-|   +-- Utils/                  # Shared utilities
-|   +-- backend/                # .NET API gateway
-|   |   +-- Controllers/VideoController.cs
-|   |   +-- Dockerfile.dotnet
++-- Backend/                        # .NET API gateway (ASP.NET Core 9)
+|   +-- Controllers/
+|   |   +-- VideoController.cs      # /Video/upload, /Video/cleanup, etc.
+|   +-- Data/AppDbContext.cs        # EF Core DbContext
+|   +-- Models/                     # Session, LandmarkData, Analysis, Video
+|   +-- Migrations/                 # EF Core SQLite migrations
+|   +-- Services/, PublicClasses/
+|   +-- Program.cs
+|   +-- AI-spotter.csproj
+|   +-- appsettings.json            # Connection string, Python backend URL
+|   +-- Dockerfile.dotnet
++-- AI/                             # Python AI processing (FastAPI)
+|   +-- api/main.py                 # FastAPI entry point (uvicorn api.main:app)
+|   +-- MediaPipe.py                # Pose estimation processor
+|   +-- process_landmarks/
+|   |   +-- exercise_config.py      # Exercise definitions
+|   |   +-- create_template.py      # Template builder
+|   |   +-- create_embedding.py     # Embedding pipeline
+|   |   +-- dtw_analysis.py         # DTW comparison
+|   |   +-- dtw_model.py            # DTW wrapper
+|   |   +-- verdict.py              # Feedback generator
+|   |   +-- model_config.py         # ACTIVE_MODEL switch
+|   +-- mlp/                        # VAE alternatives (Stats, LSTM, LSTM+Attention)
+|   +-- Model_research_notebooks/   # Jupyter notebooks for model experimentation
+|   +-- templates/                  # Pro reference templates (.npz)
+|   +-- MediaPipe_landmarks/        # Saved landmark data (.npy, runtime)
+|   +-- Utils/                      # Shared utilities
 |   +-- Dockerfile.python
 |   +-- requirements.txt
-|   +-- test.py                 # End-to-end test script
-+-- DOCKER_SETUP.md             # Extended Docker documentation
+|   +-- test.py                     # End-to-end test script
++-- DOCKER_SETUP.md                 # Extended Docker documentation
++-- ARCHITECTURE.md                 # Deep architecture documentation
 ```
 
 ## Troubleshooting
