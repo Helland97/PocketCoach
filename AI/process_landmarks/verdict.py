@@ -7,10 +7,40 @@ from Utils.utils.utils import (
     find_rep_boundaries,
     extract_rep_angles,
 )
-from AI.process_landmarks.exercise_config import EXERCISE_CONFIGS, CORE_FEATURES
-from AI.process_landmarks.create_template import load_template
-from AI.process_landmarks.create_embedding import build_embedding
-from AI.process_landmarks.dtw_analysis import compare_rep_to_template
+from process_landmarks.exercise_config import EXERCISE_CONFIGS, CORE_FEATURES
+from process_landmarks.create_embedding import build_embedding
+from process_landmarks.model_config import ACTIVE_MODEL
+
+
+# Cache the loaded model so it's only initialized once
+_cached_model = None
+_cached_model_name = None
+
+
+def _load_model(exercise_type):
+    """Load the active model based on ACTIVE_MODEL config. Caches the instance."""
+    global _cached_model, _cached_model_name
+    if _cached_model is not None and _cached_model_name == ACTIVE_MODEL:
+        return _cached_model
+
+    if ACTIVE_MODEL == "dtw":
+        from process_landmarks.dtw_model import DTWModel
+        _cached_model = DTWModel()
+    elif ACTIVE_MODEL == "stats_vae":
+        from mlp.inference import StatsVAEModel
+        _cached_model = StatsVAEModel()
+    elif ACTIVE_MODEL == "lstm_vae":
+        from mlp.inference import LSTMVAEModel
+        _cached_model = LSTMVAEModel()
+    elif ACTIVE_MODEL == "lstm_attention_vae":
+        from mlp.inference import LSTMAttentionVAEModel
+        _cached_model = LSTMAttentionVAEModel()
+    else:
+        raise ValueError(f"Unknown model in model_config.py: {ACTIVE_MODEL}")
+
+    _cached_model_name = ACTIVE_MODEL
+    print(f"[Verdict] Loaded model: {ACTIVE_MODEL}")
+    return _cached_model
 
 
 def generate_feedback(rep_result, rep_number):
@@ -83,13 +113,13 @@ def analyze_user_video(landmarks, template_path, exercise_type='heavy_squat'):
 
     Args:
         landmarks: (T, 33, 3) or (T, 33, 4) numpy array of user MediaPipe landmarks.
-        template_path: path to the saved .npz template file.
+        template_path: path to the saved .npz template file (used by DTW model).
         exercise_type: key into EXERCISE_CONFIGS for rep detection.
 
     Returns:
         dict with n_reps, average_score, and per-rep results + feedback.
     """
-    template, feature_names, core_features = load_template(template_path)
+    model = _load_model(exercise_type)
 
     # Use only x,y,z (ignore visibility if present)
     lm = landmarks[:, :, :3] if landmarks.shape[2] > 3 else landmarks
@@ -100,13 +130,18 @@ def analyze_user_video(landmarks, template_path, exercise_type='heavy_squat'):
     # Build the biomechanical embedding (angles + velocity + symmetry + depth)
     embedding, emb_feature_names = build_embedding(smooth, lm)
 
+    # Determine feature names and core features
+    feature_names = ANGLE_NAMES
+    exercise_key = 'squat' if 'squat' in exercise_type else exercise_type
+    core_features = CORE_FEATURES.get(exercise_key, CORE_FEATURES.get('squat', []))
+
     exercise_config = EXERCISE_CONFIGS[exercise_type]
     reps, _ = find_rep_boundaries(smooth, exercise_config)
     reps_data = extract_rep_angles(smooth, reps)
 
     results = []
     for i, rep in enumerate(reps_data):
-        result = compare_rep_to_template(rep, template, feature_names, core_features)
+        result = model.score_rep(rep, feature_names, core_features, exercise_type)
         feedback = generate_feedback(result, i + 1)
         results.append({
             'rep_number': i + 1,

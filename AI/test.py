@@ -1,7 +1,7 @@
 if __name__ == "__main__":
 
 
-    from AI.MediaPipe import MediaPipeVideoProcessor
+    from MediaPipe import MediaPipeVideoProcessor
 
     try:
         import os
@@ -26,11 +26,11 @@ if __name__ == "__main__":
         # ============================================================
         # Step 2: Load the generated landmarks and run analysis
         # ============================================================
-        from AI.process_landmarks.create_embedding import create_embedding_from_landmarks
-        from AI.process_landmarks.create_template import load_template
-        from AI.process_landmarks.dtw_analysis import compare_rep_to_template
-        from AI.process_landmarks.verdict import generate_feedback, analyze_user_video
-        from AI.process_landmarks.exercise_config import EXERCISE_CONFIGS
+        from process_landmarks.create_embedding import create_embedding_from_landmarks
+        from process_landmarks.create_template import load_template
+        from process_landmarks.dtw_analysis import compare_rep_to_template
+        from process_landmarks.verdict import generate_feedback, analyze_user_video
+        from process_landmarks.exercise_config import EXERCISE_CONFIGS
         from Utils.utils.utils import (
             smooth_angles,
             find_rep_boundaries,
@@ -39,8 +39,8 @@ if __name__ == "__main__":
 
         # Derive landmarks path (same logic as MediaPipe.py)
         base_name = os.path.splitext(os.path.basename(output_video))[0]
-        landmarks_path = os.path.join("AI/MediaPipe_landmarks", base_name + "_landmarks.npy")
-        template_path = os.path.join("AI/templates", TEMPLATE_FILE)
+        landmarks_path = os.path.join("MediaPipe_landmarks", base_name + "_landmarks.npy")
+        template_path = os.path.join("templates", TEMPLATE_FILE)
 
         print(f"\n{'='*70}")
         print(f"Loading landmarks: {landmarks_path}")

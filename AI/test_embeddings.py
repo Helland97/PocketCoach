@@ -14,8 +14,8 @@ if __name__ == "__main__":
     # ============================================================
     # Available files (for reference)
     # ============================================================
-    LANDMARKS_DIR = "AI/MediaPipe_landmarks"
-    TEMPLATES_DIR = "AI/templates"
+    LANDMARKS_DIR = "MediaPipe_landmarks"
+    TEMPLATES_DIR = "templates"
 
     print("Available landmark files:")
     for f in sorted(os.listdir(LANDMARKS_DIR)):
@@ -31,11 +31,11 @@ if __name__ == "__main__":
     # Run pipeline
     # ============================================================
     try:
-        from AI.process_landmarks.create_embedding import create_embedding_from_landmarks
-        from AI.process_landmarks.create_template import load_template
-        from AI.process_landmarks.dtw_analysis import compare_rep_to_template
-        from AI.process_landmarks.verdict import generate_feedback, analyze_user_video
-        from AI.process_landmarks.exercise_config import EXERCISE_CONFIGS
+        from process_landmarks.create_embedding import create_embedding_from_landmarks
+        from process_landmarks.create_template import load_template
+        from process_landmarks.dtw_analysis import compare_rep_to_template
+        from process_landmarks.verdict import generate_feedback, analyze_user_video
+        from process_landmarks.exercise_config import EXERCISE_CONFIGS
         from Utils.utils.utils import (
             smooth_angles,
             find_rep_boundaries,

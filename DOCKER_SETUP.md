@@ -101,11 +101,11 @@ docker-compose ps
 **Local Development:**
 ```bash
 # Terminal 1 - Python backend
-cd AI/OlympicAi
+cd AI
 uvicorn backend.main:app --reload
 
 # Terminal 2 - .NET backend
-cd AI/OlympicAi/backend
+cd AI/backend
 dotnet run
 
 # Terminal 3 - Frontend

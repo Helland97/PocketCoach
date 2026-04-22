@@ -1,0 +1,55 @@
+# ============================================================
+# .NET .dockerignore for the dotnet-backend build context (./AI/backend)
+# ============================================================
+
+# Python files (this directory is shared with the Python build — not needed for the .NET image)
+main.py
+__pycache__/
+*.py[cod]
+*.so
+
+# .NET build artifacts
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dbmdl
+*.jfm
+*.pfx
+*.publishsettings
+
+# Volume-mounted / generated runtime directories
+Videos/
+ProcessedVideos/
+Landmarks/
+
+# SQLite database files (never bake a local DB into the image)
+# NOTE: Do NOT ignore the whole Data/ directory — it contains AppDbContext.cs source.
+Data/*.db
+Data/*.db-shm
+Data/*.db-wal
+*.db
+*.db-shm
+*.db-wal
+
+# OS / IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (not needed in runtime image)
+*.md
+README*
+
+# Test / dev files
+*.http

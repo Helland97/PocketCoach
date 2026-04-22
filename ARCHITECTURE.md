@@ -9,10 +9,10 @@ Deep documentation of every file, folder, and module in the AI Spotter project.
 1. [Project Overview](#project-overview)
 2. [Root Directory](#root-directory)
 3. [Frontend (`frontend/`)](#frontend)
-4. [.NET API Gateway (`AI/OlympicAi/backend/`)](#net-api-gateway)
-5. [Python AI Backend (`AI/OlympicAi/`)](#python-ai-backend)
-6. [AI Processing Pipeline (`AI/OlympicAi/AI/`)](#ai-processing-pipeline)
-7. [Utilities (`AI/OlympicAi/Utils/`)](#utilities)
+4. [.NET API Gateway (`AI/backend/`)](#net-api-gateway)
+5. [Python AI Backend (`AI/`)](#python-ai-backend)
+6. [AI Processing Pipeline (`AI/`)](#ai-processing-pipeline)
+7. [Utilities (`AI/Utils/`)](#utilities)
 8. [Data Files](#data-files)
 9. [Docker Infrastructure](#docker-infrastructure)
 10. [Request Flow](#request-flow)
@@ -47,13 +47,13 @@ TempAISpotter/
 +-- package.json
 +-- package-lock.json
 +-- AI/
-|   +-- OlympicAi/           # Python + .NET backends
+|   +-- AI/ Python + .NET backends
 +-- frontend/                 # React frontend
 ```
 
 ### `.gitignore`
 
-Ignores Python virtualenvs, `__pycache__`, `node_modules`, IDE files, .NET `bin/`/`obj/`, and all video files (`*.mp4`, `*.mov`, `*.avi`, `*.mkv`). Also ignores `AI/OlympicAi/Backend/Videos/`.
+Ignores Python virtualenvs, `__pycache__`, `node_modules`, IDE files, .NET `bin/`/`obj/`, and all video files (`*.mp4`, `*.mov`, `*.avi`, `*.mkv`). Also ignores `AI/backend/Videos/`.
 
 ### `package.json` (root)
 
@@ -180,7 +180,7 @@ Two-stage build:
 ## .NET API Gateway
 
 ```
-AI/OlympicAi/backend/
+AI/backend/
 +-- AI-spotter.csproj         # .NET 9 project file
 +-- AI-spotter.http           # HTTP test file (for VS REST Client)
 +-- Program.cs                # Application entry point
@@ -307,10 +307,10 @@ Three-stage build:
 ## Python AI Backend
 
 ```
-AI/OlympicAi/
+AI/
 +-- .gitignore                # Ignores videos/, ProcessedVideos/, landmarks, embeddings, templates
 +-- Dockerfile.python         # Python 3.11-slim + system deps + pip install
-+-- OlympicAi.sln             # Visual Studio solution file (references backend/AI-spotter.csproj)
++-- # .sln file removed in refactor             # Visual Studio solution file (references backend/AI-spotter.csproj)
 +-- README.md                 # Python backend documentation
 +-- requirements.txt          # Python dependencies
 +-- test.py                   # End-to-end test script
@@ -385,7 +385,7 @@ Single-stage build on `python:3.11-slim`:
 1. Installs system dependencies: `libgl1`, `libglib2.0-0`, `libgomp1`, `ffmpeg`, `libx264-dev`, `libsm6`, `libxext6`, `libxrender1`
 2. Installs Python packages from `requirements.txt`
 3. Copies `AI/`, `Utils/`, and `backend/main.py`
-4. Creates `Videos/`, `ProcessedVideos/`, `AI/MediaPipe_landmarks/` directories
+4. Creates `Videos/`, `ProcessedVideos/`, `MediaPipe_landmarks/` directories
 5. Runs `uvicorn backend.main:app --host 0.0.0.0 --port 8000`
 
 ---
@@ -393,7 +393,7 @@ Single-stage build on `python:3.11-slim`:
 ## AI Processing Pipeline
 
 ```
-AI/OlympicAi/AI/
+AI/
 +-- __init__.py                         # Empty package marker
 +-- MediaPipe.py                        # Pose estimation video processor
 +-- embedding/                          # Pre-computed embedding .npy files
@@ -430,7 +430,7 @@ This dict is shared with the FastAPI `/progress` endpoint for real-time progress
   3. Extracts 33 landmarks per frame (x, y, z, visibility) -> `(T, 33, 4)` numpy array
   4. Draws skeleton overlay on each frame
   5. Writes processed video to output path
-  6. Saves landmarks as `.npy` file in `AI/MediaPipe_landmarks/`
+  6. Saves landmarks as `.npy` file in `MediaPipe_landmarks/`
   7. Updates `processing_progress` each frame
   8. Returns `{ path: output_path }` dict
 
@@ -590,7 +590,7 @@ Jupyter notebook used during development to prototype the embedding and DTW pipe
 ## Utilities
 
 ```
-AI/OlympicAi/Utils/
+AI/Utils/
 +-- __init__.py               # Empty package marker
 +-- utils/
 |   +-- __init__.py           # Empty package marker
@@ -674,7 +674,7 @@ Real-time rep counter that tracks the right knee angle (hip-knee-ankle). State m
 
 ## Data Files
 
-### Templates (`AI/templates/`)
+### Templates (`templates/`)
 
 Pro reference templates saved as `.npz` (NumPy compressed archive):
 
@@ -685,7 +685,7 @@ Pro reference templates saved as `.npz` (NumPy compressed archive):
 
 Each `.npz` contains: `template` array (T, 13), `feature_names`, `core_features`, creation metadata.
 
-### Landmarks (`AI/MediaPipe_landmarks/`)
+### Landmarks (`MediaPipe_landmarks/`)
 
 Pre-processed pose landmarks saved as `.npy` (NumPy array):
 
@@ -733,7 +733,7 @@ Orchestrates three services on a bridge network (`app-network`):
 **Shared volumes:**
 - `video-storage` — Mounted at `/app/Videos` on both backends
 - `processed-storage` — Mounted at `/app/ProcessedVideos` on both backends
-- `landmarks-storage` — Mounted at `/app/AI/MediaPipe_landmarks` on Python backend
+- `landmarks-storage` — Mounted at `/app/MediaPipe_landmarks` on Python backend
 
 **Resource limits:**
 - Python backend: 4 GB memory limit, 2 GB reserved
@@ -777,7 +777,7 @@ nginx (:80)
 Python Backend (:8000)
   |
   | MediaPipe processes video frame-by-frame
-  | Saves landmarks to AI/MediaPipe_landmarks/{name}_landmarks.npy
+  | Saves landmarks to MediaPipe_landmarks/{name}_landmarks.npy
   | Saves processed video to ProcessedVideos/
   | Returns { path: "ProcessedVideos/..." }
   |

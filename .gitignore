@@ -5,10 +5,13 @@ venv/
 .venv/
 **/venv/
 **/.venv/
+**/.conda/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+*.egg
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
@@ -34,6 +37,9 @@ yarn-error.log*
 
 # VS Code (optional, remove if you want to commit settings)
 .vscode/
+
+# Claude Code local settings (user-specific)
+.claude/settings.local.json
 
 # ========================================
 # macOS system files
@@ -64,5 +70,27 @@ obj/
 *.avi
 *.mkv
 
-# Ignore entire videos folder (confirm correct path)
-AI/OlympicAi/Backend/Videos/
+# ========================================
+# Environment / secrets
+# ========================================
+.env
+.env.local
+.env.development
+.env.production
+.env*.local
+
+# ========================================
+# Generated / volume-mounted directories under AI/
+# (Folders themselves are tracked via a .gitignore inside each;
+#  all content within them is ignored.)
+# ========================================
+AI/.conda/
+
+# ========================================
+# Trained model weights & training data
+# (Committed templates stay; these are user-trained artifacts)
+# ========================================
+AI/mlp/models/*.pt
+AI/mlp/models/*.npz
+AI/mlp/models/*.json
+AI/training_data/**/*.npy

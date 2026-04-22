@@ -289,11 +289,11 @@ class MediaPipeVideoProcessor:
 
         # ✅ Make sure the folder exists
         print(f"[MediaPipe] [{time.time()-start_time:.2f}s] Saving landmarks...")
-        os.makedirs("AI/MediaPipe_landmarks", exist_ok=True)
+        os.makedirs("MediaPipe_landmarks", exist_ok=True)
 
         # ✅ Create path using the same base filename as the video
         base_name = os.path.splitext(os.path.basename(output_path))[0]
-        npy_output_path = os.path.join("AI/MediaPipe_landmarks", base_name + "_landmarks.npy")
+        npy_output_path = os.path.join("MediaPipe_landmarks", base_name + "_landmarks.npy")
 
         # ✅ Save NumPy array
         np.save(npy_output_path, landmarks_data)

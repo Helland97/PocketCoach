@@ -111,7 +111,7 @@ If you prefer to run each service directly for development:
 ### Terminal 1 - Python Backend
 
 ```bash
-cd AI/OlympicAi
+cd AI
 python -m venv venv
 
 # Windows
@@ -126,7 +126,7 @@ uvicorn backend.main:app --reload
 ### Terminal 2 - .NET Backend
 
 ```bash
-cd AI/OlympicAi/backend
+cd AI/backend
 dotnet run
 ```
 
@@ -184,7 +184,7 @@ TempAISpotter/
 |   +-- src/App.tsx             # Main UI component
 |   +-- nginx.conf              # Reverse proxy config
 |   +-- Dockerfile
-+-- AI/OlympicAi/
++-- AI/
 |   +-- AI/
 |   |   +-- MediaPipe.py        # Pose estimation processor
 |   |   +-- process_landmarks/

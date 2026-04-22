@@ -10,7 +10,7 @@ from Utils.utils.utils import (
     compute_angle_features_2d,
     smooth_angles,
 )
-from AI.process_landmarks.exercise_config import EXERCISE_CONFIGS, CORE_FEATURES
+from process_landmarks.exercise_config import EXERCISE_CONFIGS, CORE_FEATURES
 
 
 def create_template_rep(pro_reps_angles, target_length=100, method='average',

@@ -4,6 +4,7 @@ using AI_spotter.Models;
 using AI_spotter.Data;
 using AI_spotter.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using AI_spotter.PublicClasses;
 using System.Net.Http;
 using System.Text.Json;
@@ -158,7 +159,9 @@ public class VideoController : ControllerBase{
     public async Task<IActionResult> UploadAndVerdict(
         IFormFile video,
         [FromForm] string exercise = "heavy_squat",
-        [FromForm] string camera_angle = "front_narrow"){
+        [FromForm] string camera_angle = "front_narrow",
+        [FromForm] string consent = "false"){
+        bool userConsented = consent.Equals("true", StringComparison.OrdinalIgnoreCase);
         var startTime = DateTime.Now;
         try {
             Console.WriteLine($"[.NET] Starting UploadAndVerdict (exercise={exercise}, camera={camera_angle})");
@@ -210,12 +213,24 @@ public class VideoController : ControllerBase{
             var verdictObj = JsonSerializer.Deserialize<JsonElement>(verdictJson);
             var analysisObj = JsonSerializer.Deserialize<JsonElement>(analysisJson);
 
-            // 5. Persist to SQLite database
-            try {
-                await PersistToDatabase(videoReference, exercise, camera_angle, analysisObj);
-            } catch (Exception dbEx) {
-                Console.WriteLine($"[.NET] Database save warning: {dbEx.Message}");
-                // Don't fail the request if DB save fails — still return results
+            // 5. Data handling based on user consent
+            if (userConsented)
+            {
+                try {
+                    int sessionId = await PersistToDatabase(videoReference, exercise, camera_angle, analysisObj);
+                    // ---------------------------------------------------------------
+                    // FUTURE: Send data to remote database before deleting locally.
+                    // await SendToRemoteDatabase(sessionId);
+                    // ---------------------------------------------------------------
+                    await DeleteSessionData(sessionId);
+                    Console.WriteLine($"[.NET] Consent=true: data saved, sent (future), and cleaned up");
+                } catch (Exception dbEx) {
+                    Console.WriteLine($"[.NET] Data handling warning: {dbEx.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[.NET] Consent=false: no data persisted");
             }
 
             // 6. Strip embedding fields from response (frontend doesn't need them)
@@ -240,7 +255,7 @@ public class VideoController : ControllerBase{
         }
     }
 
-    private async Task PersistToDatabase(Video videoReference, string exercise, string cameraAngle, JsonElement analysisObj)
+    private async Task<int> PersistToDatabase(Video videoReference, string exercise, string cameraAngle, JsonElement analysisObj)
     {
         // Read raw landmark .npy file from the shared volume
         var baseName = Path.GetFileNameWithoutExtension(videoReference.Name);
@@ -326,7 +341,39 @@ public class VideoController : ControllerBase{
         await _db.SaveChangesAsync();
 
         Console.WriteLine($"[.NET] Saved session {session.Id} to database (exercise={exercise}, reps={nReps})");
+        return session.Id;
     }
+
+    private async Task DeleteSessionData(int sessionId)
+    {
+        var analysisEntity = await _db.Analyses.FirstOrDefaultAsync(a => a.SessionId == sessionId);
+        if (analysisEntity != null) _db.Analyses.Remove(analysisEntity);
+
+        var landmarkEntity = await _db.Landmarks.FirstOrDefaultAsync(l => l.SessionId == sessionId);
+        if (landmarkEntity != null) _db.Landmarks.Remove(landmarkEntity);
+
+        var session = await _db.Sessions.FindAsync(sessionId);
+        if (session != null) _db.Sessions.Remove(session);
+
+        await _db.SaveChangesAsync();
+        Console.WriteLine($"[.NET] Deleted session {sessionId} data from local database");
+    }
+
+    // ---------------------------------------------------------------
+    // FUTURE: Implement this when you have a remote PostgreSQL server.
+    // private async Task SendToRemoteDatabase(int sessionId)
+    // {
+    //     var session = await _db.Sessions.FindAsync(sessionId);
+    //     var landmark = await _db.Landmarks
+    //         .FirstOrDefaultAsync(l => l.SessionId == sessionId);
+    //     var analysis = await _db.Analyses
+    //         .FirstOrDefaultAsync(a => a.SessionId == sessionId);
+    //
+    //     // POST to your remote server:
+    //     // var payload = new { session, landmark, analysis };
+    //     // await _httpClient.PostAsJsonAsync("https://your-server.com/api/data", payload);
+    // }
+    // ---------------------------------------------------------------
 
     [HttpPost("cleanup")]
     public IActionResult CleanupVideos([FromBody] JsonElement data){

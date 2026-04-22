@@ -5,10 +5,12 @@ from typing import Annotated
 from io import BytesIO
 from fastapi import FastAPI, File, UploadFile,  HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse, JSONResponse
-from AI.MediaPipe import MediaPipeVideoProcessor, processing_progress
-from AI.process_landmarks.verdict import analyze_user_video
+from MediaPipe import MediaPipeVideoProcessor, processing_progress
+from process_landmarks.verdict import analyze_user_video
 import numpy as np
+import time
 import tempfile
+import traceback
 
 
 app = FastAPI()
@@ -86,7 +88,7 @@ async def process_in_memory(filename: str):
 
 @app.get("/verdict", response_class=JSONResponse)
 def get_verdict(path: str):
-    import time
+
     start_time = time.time()
     try:
         print(f"[{time.time()-start_time:.2f}s] Received verdict request for path: {path}")
@@ -108,7 +110,6 @@ def get_verdict(path: str):
         return result
     except Exception as e:
         print(f"ERROR in get_verdict after {time.time()-start_time:.2f}s: {str(e)}")
-        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -120,13 +121,13 @@ def analyze_landmarks(path: str, exercise_type: str = "heavy_squat",
     that MediaPipe saved, creates an embedding, runs DTW analysis against
     the chosen template, and returns the verdict.
     """
-    import time
+    
     start_time = time.time()
     try:
         # Derive landmarks path from the video path (same logic as MediaPipe.py)
         base_name = os.path.splitext(os.path.basename(path))[0]
-        landmarks_path = os.path.join("AI/MediaPipe_landmarks", base_name + "_landmarks.npy")
-        template_path = os.path.join("AI/templates", template)
+        landmarks_path = os.path.join("MediaPipe_landmarks", base_name + "_landmarks.npy")
+        template_path = os.path.join("templates", template)
 
         print(f"[Analyze] Received request - video: {path}")
         print(f"[Analyze] Landmarks: {landmarks_path}")
@@ -164,7 +165,7 @@ def analyze_landmarks(path: str, exercise_type: str = "heavy_squat",
         raise
     except Exception as e:
         print(f"[Analyze] ERROR after {time.time()-start_time:.2f}s: {str(e)}")
-        import traceback
+    
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 

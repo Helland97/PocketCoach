@@ -1,0 +1,4 @@
+# Ignore everything in this folder except this .gitignore file.
+# The folder is tracked so it exists after cloning; contents are runtime-generated.
+*
+!.gitignore

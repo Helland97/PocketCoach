@@ -23,4 +23,17 @@ EXERCISE_CONFIGS = {
 # Core features per exercise type (which joints matter most for comparison)
 CORE_FEATURES = {
     'squat': ['left_knee', 'right_knee', 'left_hip', 'right_hip', 'trunk_lean'],
+    'deadlift': ['left_hip', 'right_hip', 'left_knee', 'right_knee', 'trunk_lean'],
+    'benchpress': ['left_elbow', 'right_elbow', 'left_shoulder', 'right_shoulder'],
+    'military_press': ['left_elbow', 'right_elbow', 'left_shoulder', 'right_shoulder', 'trunk_lean'],
 }
+
+# Exercise-to-index mapping for one-hot encoding in VAE models
+EXERCISE_INDEX = {
+    'back_squat': 0,
+    'front_squat': 1,
+    'deadlift': 2,
+    'benchpress': 3,
+    'military_press': 4,
+}
+NUM_EXERCISES = len(EXERCISE_INDEX)

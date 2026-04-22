@@ -107,6 +107,20 @@ const CAMERA_ANGLES: { value: CameraAngle; label: string; description: string }[
     { value: "45_front_right", label: "45° Front Right", description: "Diagonal from front-right" },
 ];
 
+// --- Data consent helpers (persists across sessions) ---
+const CONSENT_KEY = "ai_spotter_data_consent";
+
+function getStoredConsent(): boolean | null {
+    const val = localStorage.getItem(CONSENT_KEY);
+    if (val === "true") return true;
+    if (val === "false") return false;
+    return null; // never asked
+}
+
+function setStoredConsent(value: boolean) {
+    localStorage.setItem(CONSENT_KEY, String(value));
+}
+
 export default function App() {
     const [exercise, setExercise] = useState<Exercise | null>(null);
     const [cameraAngle, setCameraAngle] = useState<CameraAngle | null>(null);
@@ -120,6 +134,12 @@ export default function App() {
     const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
     const [expandedReps, setExpandedReps] = useState<Set<number>>(new Set());
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const [dataConsent, setDataConsent] = useState<boolean | null>(getStoredConsent);
+    const showConsentModal = dataConsent === null;
+    const [showSettings, setShowSettings] = useState(false);
+    const [showBugReport, setShowBugReport] = useState(false);
+    const [bugDescription, setBugDescription] = useState("");
+    const [bugSubmitted, setBugSubmitted] = useState(false);
 
     // Poll /progress every 500ms while analyzing
     useEffect(() => {
@@ -235,6 +255,7 @@ export default function App() {
                 formData.append('video', vidBlob, 'video.mp4');
                 formData.append('exercise', exercise!);
                 formData.append('camera_angle', cameraAngle!);
+                formData.append('consent', String(dataConsent === true));
 
                 setAnalyzing(true);
                 const res = await fetch(`/Video/upload`, { method: "POST", body: formData });
@@ -270,6 +291,42 @@ export default function App() {
 
     const selectedExerciseLabel = EXERCISES.find(e => e.value === exercise)?.label;
     const selectedAngleLabel = CAMERA_ANGLES.find(a => a.value === cameraAngle)?.label;
+
+    function handleConsent(accepted: boolean) {
+        setStoredConsent(accepted);
+        setDataConsent(accepted);
+    }
+
+    if (showConsentModal) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.consentModal}>
+                    <h2 className={styles.consentTitle}>Help Us Improve</h2>
+                    <p className={styles.consentText}>
+                        AI Spotter can collect anonymized movement data to improve our exercise analysis models.
+                        No videos are stored — only skeleton joint data and analysis results.
+                    </p>
+                    <p className={styles.consentText}>
+                        You can change this at any time in the app settings.
+                    </p>
+                    <div className={styles.consentButtons}>
+                        <button
+                            className={styles.consentAccept}
+                            onClick={() => handleConsent(true)}
+                        >
+                            Accept
+                        </button>
+                        <button
+                            className={styles.consentDecline}
+                            onClick={() => handleConsent(false)}
+                        >
+                            Decline
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={styles.container}>
@@ -633,6 +690,133 @@ export default function App() {
                         <path d="M12 8V12M12 16H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                     </svg>
                     <p className={styles.errorText}>{error}</p>
+                </div>
+            )}
+
+            {/* Settings gear button (top-right) */}
+            <button
+                className={styles.settingsButton}
+                onClick={() => setShowSettings(!showSettings)}
+                title="Settings"
+            >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z" stroke="currentColor" strokeWidth="1.5"/>
+                </svg>
+            </button>
+
+            {/* Settings panel */}
+            {showSettings && (
+                <div className={styles.settingsPanel}>
+                    <div className={styles.settingsPanelHeader}>
+                        <h3 className={styles.settingsPanelTitle}>Settings</h3>
+                        <button className={styles.settingsClose} onClick={() => setShowSettings(false)}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                        </button>
+                    </div>
+                    <div className={styles.settingsRow}>
+                        <div className={styles.settingsLabel}>
+                            <span className={styles.settingsLabelText}>Share movement data</span>
+                            <span className={styles.settingsLabelDesc}>Help improve our AI models with anonymized joint data</span>
+                        </div>
+                        <button
+                            className={`${styles.toggle} ${dataConsent ? styles.toggleOn : ""}`}
+                            onClick={() => handleConsent(!dataConsent)}
+                            role="switch"
+                            aria-checked={dataConsent === true}
+                        >
+                            <span className={styles.toggleKnob} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Bug report button (bottom-right) */}
+            <button
+                className={styles.bugButton}
+                onClick={() => { setShowBugReport(true); setBugSubmitted(false); setBugDescription(""); }}
+                title="Report a bug"
+            >
+                <svg className={styles.bugIcon} width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* Legs */}
+                    <path d="M5.5 10.5L2.5 8.5M5.5 14L2.5 16M5.5 17.5L3.5 20.5M18.5 10.5L21.5 8.5M18.5 14L21.5 16M18.5 17.5L20.5 20.5" stroke="#888" strokeWidth="1.3" strokeLinecap="round"/>
+                    {/* Body */}
+                    <ellipse cx="12" cy="15" rx="5.5" ry="6" fill="#3d2b1a"/>
+                    {/* Wing split */}
+                    <line x1="12" y1="9.5" x2="12" y2="21" stroke="#2a1d10" strokeWidth="0.8"/>
+                    {/* Wing shells (elytra) */}
+                    <path d="M6.5 15c0-3 2.5-5.5 5.5-5.5v11c-3 0-5.5-2.5-5.5-5.5z" fill="#c0392b"/>
+                    <path d="M17.5 15c0-3-2.5-5.5-5.5-5.5v11c3 0 5.5-2.5 5.5-5.5z" fill="#e74c3c"/>
+                    {/* Spots */}
+                    <circle cx="9.5" cy="13" r="0.9" fill="#2c1810"/>
+                    <circle cx="10" cy="16.5" r="0.8" fill="#2c1810"/>
+                    <circle cx="14.5" cy="13" r="0.9" fill="#2c1810"/>
+                    <circle cx="14" cy="16.5" r="0.8" fill="#2c1810"/>
+                    {/* Head */}
+                    <ellipse cx="12" cy="8.5" rx="3" ry="2.2" fill="#1a1a1a"/>
+                    {/* Antennae */}
+                    <path d="M10 7L8 4.5M14 7L16 4.5" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round"/>
+                    <circle cx="7.7" cy="4" r="0.7" fill="#1a1a1a"/>
+                    <circle cx="16.3" cy="4" r="0.7" fill="#1a1a1a"/>
+                    {/* Eyes */}
+                    <circle cx="10.5" cy="8" r="0.7" fill="#fff"/>
+                    <circle cx="13.5" cy="8" r="0.7" fill="#fff"/>
+                </svg>
+                <span className={styles.bugLabel}>Report a bug</span>
+            </button>
+
+            {/* Bug report modal */}
+            {showBugReport && (
+                <div className={styles.bugOverlay} onClick={() => setShowBugReport(false)}>
+                    <div className={styles.bugModal} onClick={e => e.stopPropagation()}>
+                        <div className={styles.settingsPanelHeader}>
+                            <h3 className={styles.settingsPanelTitle}>Report a Bug</h3>
+                            <button className={styles.settingsClose} onClick={() => setShowBugReport(false)}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                            </button>
+                        </div>
+
+                        {bugSubmitted ? (
+                            <div className={styles.bugSuccess}>
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="#27ae60" strokeWidth="1.5"/>
+                                    <path d="M8 12l3 3 5-5" stroke="#27ae60" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                                <p>Thanks for your report! We'll look into it.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <p className={styles.bugFormDesc}>
+                                    Found something that doesn't work right? Describe the issue below and we'll investigate.
+                                </p>
+                                <textarea
+                                    className={styles.bugTextarea}
+                                    placeholder="Describe the bug: what happened, what you expected, and any steps to reproduce it..."
+                                    value={bugDescription}
+                                    onChange={e => setBugDescription(e.target.value)}
+                                    rows={5}
+                                />
+                                <button
+                                    className={styles.bugSubmit}
+                                    disabled={bugDescription.trim().length === 0}
+                                    onClick={() => {
+                                        // ---------------------------------------------------------------
+                                        // FUTURE: Send bug report to your backend / email service.
+                                        // Example: await fetch("/api/bug-report", {
+                                        //   method: "POST",
+                                        //   headers: { "Content-Type": "application/json" },
+                                        //   body: JSON.stringify({ description: bugDescription, timestamp: new Date().toISOString() })
+                                        // });
+                                        // ---------------------------------------------------------------
+                                        console.log("[BugReport]", bugDescription);
+                                        setBugSubmitted(true);
+                                    }}
+                                >
+                                    Submit Report
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             )}
 

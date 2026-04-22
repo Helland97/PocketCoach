@@ -1,0 +1,77 @@
+# ============================================================
+# Python .dockerignore for the python-backend build context (./AI)
+# ============================================================
+
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual / conda environments (very large — never bake into image)
+.conda/
+venv/
+env/
+ENV/
+.venv/
+
+# .NET files (in backend/ directory — not needed for the Python image)
+# Only backend/main.py is copied by Dockerfile.python; everything else is excluded.
+backend/*.csproj
+backend/*.http
+backend/appsettings*.json
+backend/Program.cs
+backend/Dockerfile.dotnet
+backend/bin/
+backend/obj/
+backend/Data/
+backend/Landmarks/
+backend/Controllers/
+backend/Migrations/
+backend/Models/
+backend/Services/
+backend/PublicClasses/
+backend/Properties/
+backend/.gitignore
+backend/.dockerignore
+
+# Volume-mounted directories (populated at runtime)
+Videos/
+ProcessedVideos/
+MediaPipe_landmarks/
+backend/Videos/
+videos/
+
+# Research / development artifacts not needed at runtime
+Model_research_notebooks/
+training_data/
+embedding/
+mlp/models/
+test.py
+test_embeddings.py
+
+# OS / IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (not needed in runtime image)
+*.md
+README*
+
+# Solution files
+*.sln

@@ -21,8 +21,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy the AI module (MediaPipe code)
-COPY AI/ ./AI/
+# Copy Python modules (flat structure after OlympicAi removal)
+COPY MediaPipe.py ./
+COPY process_landmarks/ ./process_landmarks/
+COPY mlp/ ./mlp/
+COPY templates/ ./templates/
 
 # Copy the Utils module (required by MediaPipe)
 COPY Utils/ ./Utils/
@@ -31,7 +34,7 @@ COPY Utils/ ./Utils/
 COPY backend/main.py ./backend/
 
 # Create necessary directories
-RUN mkdir -p Videos ProcessedVideos AI/MediaPipe_landmarks backend
+RUN mkdir -p Videos ProcessedVideos MediaPipe_landmarks backend
 
 # Expose port
 EXPOSE 8000
