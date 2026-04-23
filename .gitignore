@@ -94,9 +94,15 @@ AI/.conda/
 
 # ========================================
 # Trained model weights & training data
-# (Committed templates stay; these are user-trained artifacts)
+# (User-trained artifacts — stay local)
 # ========================================
 AI/mlp/models/*.pt
 AI/mlp/models/*.npz
 AI/mlp/models/*.json
 AI/training_data/**/*.npy
+
+# Pro reference templates — kept local, not committed
+AI/templates/
+
+# Model research notebooks — scratch work, stay local
+AI/Model_research_notebooks/
