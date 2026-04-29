@@ -1,7 +1,7 @@
 import numpy as np
 from dtw import dtw
 
-from Utils.utils.utils import inner_to_flexion, resample_to_length
+from Utils.utils.utils import inner_to_flexion
 
 
 def per_feature_dtw_similarity(ref_angles, user_angles, feature_names):

@@ -1,13 +1,10 @@
 import os
 import time
 import cv2
-import json
-import time
 import numpy as np
 import mediapipe as mp
 import subprocess
-from Utils.utils.utils import *
-from Utils.counters.exercise_counter import ExerciseCounter
+from Utils.utils.utils import PoseLandmark, JOINTS, get_joint_coords, calculate_angle
 from Utils.counters.squat_counter import SquatCounter
 
 # Module-level progress state, read by the /progress endpoint in main.py
@@ -264,7 +261,7 @@ class MediaPipeVideoProcessor:
                 output_path  # Output file
             ]
 
-            result = subprocess.run(
+            subprocess.run(
                 ffmpeg_cmd,
                 capture_output=True,
                 text=True,
@@ -280,7 +277,7 @@ class MediaPipeVideoProcessor:
             # If re-encoding fails, restore the original file
             if os.path.exists(temp_output):
                 os.rename(temp_output, output_path)
-            print(f"[MediaPipe] Continuing with original codec")
+            print("[MediaPipe] Continuing with original codec")
         except Exception as e:
             print(f"[MediaPipe] WARNING: Error during re-encoding: {str(e)}")
             # Restore original file if something went wrong

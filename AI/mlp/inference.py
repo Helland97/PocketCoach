@@ -221,7 +221,6 @@ def _score_rep_sequence(model, user_rep_angles, feature_names, core_features,
     # Build the 29-dim embedding per frame (angles + velocities + symmetry + depth)
     # For LSTM models we use the raw angle data directly since that's what the model expects
     T = user_rep_angles.shape[0]
-    n_angle_features = user_rep_angles.shape[1]  # 13
 
     # Compute velocities
     velocity = np.diff(user_rep_angles, axis=0)  # (T-1, 13)

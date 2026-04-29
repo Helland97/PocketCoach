@@ -25,7 +25,7 @@ from Utils.utils.utils import (
     extract_rep_angles,
 )
 from process_landmarks.exercise_config import EXERCISE_CONFIGS, EXERCISE_INDEX
-from mlp.feature_stats import compute_rep_stats, STATS_DIM
+from mlp.feature_stats import compute_rep_stats
 from mlp.model import StatsVAE, LSTMVAE, LSTMAttentionVAE, vae_loss
 
 TRAINING_DATA_DIR = "training_data"
