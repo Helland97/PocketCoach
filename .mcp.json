@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "aispotter-db": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-sqlite",
+        "--db-path",
+        "Backend/Data/aispotter.db"
+      ]
+    }
+  }
+}

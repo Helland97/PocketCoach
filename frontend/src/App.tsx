@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+
 import styles from "./App.module.css";
 
 type Video = {
@@ -270,8 +271,8 @@ export default function App() {
             if (!res.ok) throw new Error(await res.text());
             const data: Video = await res.json();
             setVideo(data);
-        } catch (err: any) {
-            setError(err.message ?? String(err));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             input.value = "";
             setBusy(false);
@@ -320,9 +321,9 @@ export default function App() {
                 throw new Error("No video is selected");
             }
 
-        } catch (err: any) {
+        } catch (err) {
             setAnalyzing(false);
-            setError(err.message ?? String(err));
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             setBusy(false);
         }
