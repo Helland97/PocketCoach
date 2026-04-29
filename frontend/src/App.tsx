@@ -140,6 +140,45 @@ export default function App() {
     const [showBugReport, setShowBugReport] = useState(false);
     const [bugDescription, setBugDescription] = useState("");
     const [bugSubmitted, setBugSubmitted] = useState(false);
+    const [showIdeaReport, setShowIdeaReport] = useState(false);
+    const [ideaTitle, setIdeaTitle] = useState("");
+    const [ideaCategory, setIdeaCategory] = useState("new feature");
+    const [ideaAffectedArea, setIdeaAffectedArea] = useState("not sure");
+    const [ideaDescription, setIdeaDescription] = useState("");
+    const [ideaProblem, setIdeaProblem] = useState("");
+    const [ideaAcceptance, setIdeaAcceptance] = useState("");
+    const [ideaSubmitted, setIdeaSubmitted] = useState(false);
+    const [ideaError, setIdeaError] = useState<string | null>(null);
+
+    async function submitIdea() {
+        try {
+            setIdeaError(null);
+            const res = await fetch("/Idea/submit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: ideaTitle,
+                    category: ideaCategory,
+                    affectedArea: ideaAffectedArea,
+                    description: ideaDescription,
+                    problem: ideaProblem,
+                    acceptance: ideaAcceptance,
+                }),
+            });
+            if (!res.ok) {
+                throw new Error((await res.text()) || "Submission failed");
+            }
+            setIdeaSubmitted(true);
+            setIdeaTitle("");
+            setIdeaCategory("new feature");
+            setIdeaAffectedArea("not sure");
+            setIdeaDescription("");
+            setIdeaProblem("");
+            setIdeaAcceptance("");
+        } catch (err) {
+            setIdeaError(err instanceof Error ? err.message : String(err));
+        }
+    }
 
     // Poll /progress every 500ms while analyzing
     useEffect(() => {
@@ -727,6 +766,149 @@ export default function App() {
                         >
                             <span className={styles.toggleKnob} />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Idea report button (bottom-right, stacked above bug button) */}
+            <button
+                className={styles.ideaButton}
+                onClick={() => {
+                    setShowIdeaReport(true);
+                    setIdeaSubmitted(false);
+                    setIdeaError(null);
+                }}
+                title="Report an idea or improvement"
+            >
+                <svg className={styles.ideaIcon} width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* Lightbulb */}
+                    <path d="M9 18h6M10 21h4M12 3a7 7 0 00-4 12.7c.6.4 1 1.1 1 1.8V18h6v-.5c0-.7.4-1.4 1-1.8A7 7 0 0012 3z" stroke="#f5c518" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 7v4" stroke="#f5c518" strokeWidth="1.6" strokeLinecap="round"/>
+                </svg>
+                <span className={styles.ideaLabel}>Report an idea/improvement</span>
+            </button>
+
+            {/* Idea report modal */}
+            {showIdeaReport && (
+                <div className={styles.bugOverlay} onClick={() => setShowIdeaReport(false)}>
+                    <div className={styles.ideaModal} onClick={e => e.stopPropagation()}>
+                        <div className={styles.settingsPanelHeader}>
+                            <h3 className={styles.settingsPanelTitle}>Report an Idea or Improvement</h3>
+                            <button className={styles.settingsClose} onClick={() => setShowIdeaReport(false)}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                            </button>
+                        </div>
+
+                        {ideaSubmitted ? (
+                            <div className={styles.bugSuccess}>
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="#27ae60" strokeWidth="1.5"/>
+                                    <path d="M8 12l3 3 5-5" stroke="#27ae60" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                                <p>Thanks! Your idea was saved for review.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <p className={styles.bugFormDesc}>
+                                    Have a new feature in mind, or know how an existing one could be better? Fill in as much as you can — more detail means faster action.
+                                </p>
+
+                                <div className={styles.ideaField}>
+                                    <label className={styles.ideaFieldLabel}>Title</label>
+                                    <input
+                                        type="text"
+                                        className={styles.ideaInput}
+                                        placeholder="One-line summary (e.g. Add deadlift 45° back-right camera angle)"
+                                        value={ideaTitle}
+                                        onChange={e => setIdeaTitle(e.target.value)}
+                                        maxLength={120}
+                                    />
+                                </div>
+
+                                <div className={styles.ideaField}>
+                                    <label className={styles.ideaFieldLabel}>Category</label>
+                                    <select
+                                        className={styles.ideaInput}
+                                        value={ideaCategory}
+                                        onChange={e => setIdeaCategory(e.target.value)}
+                                    >
+                                        <option value="new feature">New feature</option>
+                                        <option value="UI/UX improvement">UI / UX improvement</option>
+                                        <option value="analysis accuracy">Analysis accuracy</option>
+                                        <option value="performance">Performance</option>
+                                        <option value="exercise/camera support">Exercise or camera support</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div className={styles.ideaField}>
+                                    <label className={styles.ideaFieldLabel}>
+                                        Affected area <span className={styles.ideaOptional}>(optional)</span>
+                                    </label>
+                                    <select
+                                        className={styles.ideaInput}
+                                        value={ideaAffectedArea}
+                                        onChange={e => setIdeaAffectedArea(e.target.value)}
+                                    >
+                                        <option value="not sure">Not sure</option>
+                                        <option value="frontend">Frontend (UI)</option>
+                                        <option value="dotnet-backend">.NET backend</option>
+                                        <option value="python-backend">Python backend / AI</option>
+                                        <option value="cross-cutting">Cross-cutting</option>
+                                        <option value="infrastructure/docker">Infrastructure / Docker</option>
+                                    </select>
+                                </div>
+
+                                <div className={styles.ideaField}>
+                                    <label className={styles.ideaFieldLabel}>Description</label>
+                                    <textarea
+                                        className={styles.bugTextarea}
+                                        placeholder="Describe the idea in detail — what should it do?"
+                                        value={ideaDescription}
+                                        onChange={e => setIdeaDescription(e.target.value)}
+                                        rows={4}
+                                    />
+                                </div>
+
+                                <div className={styles.ideaField}>
+                                    <label className={styles.ideaFieldLabel}>
+                                        Problem / motivation <span className={styles.ideaOptional}>(optional)</span>
+                                    </label>
+                                    <textarea
+                                        className={styles.bugTextarea}
+                                        placeholder="What pain point does this solve? Why does it matter?"
+                                        value={ideaProblem}
+                                        onChange={e => setIdeaProblem(e.target.value)}
+                                        rows={3}
+                                    />
+                                </div>
+
+                                <div className={styles.ideaField}>
+                                    <label className={styles.ideaFieldLabel}>
+                                        Acceptance criteria <span className={styles.ideaOptional}>(optional)</span>
+                                    </label>
+                                    <textarea
+                                        className={styles.bugTextarea}
+                                        placeholder="How will we know this is done? (e.g. deadlift is selectable; analysis under 30s; rep card shows tempo)"
+                                        value={ideaAcceptance}
+                                        onChange={e => setIdeaAcceptance(e.target.value)}
+                                        rows={3}
+                                    />
+                                </div>
+
+                                {ideaError && (
+                                    <p className={styles.ideaErrorText}>{ideaError}</p>
+                                )}
+
+                                <button
+                                    className={styles.bugSubmit}
+                                    disabled={ideaTitle.trim().length === 0 || ideaDescription.trim().length === 0}
+                                    onClick={submitIdea}
+                                >
+                                    Submit Idea
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

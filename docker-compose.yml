@@ -28,6 +28,7 @@ services:
       - processed-storage:/app/ProcessedVideos
       - sqlite-data:/app/Data
       - landmarks-storage:/app/Landmarks:ro
+      - ./ideas:/app/Ideas
     depends_on:
       - python-backend
     networks:
