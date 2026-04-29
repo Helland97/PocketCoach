@@ -1326,3 +1326,111 @@
   color: #ccc;
   font-size: 0.95rem;
 }
+
+/* ---------- Idea Report Button (stacks above bug button) ---------- */
+.ideaButton {
+  position: fixed;
+  bottom: calc(1.25rem + 42px + 0.5rem);
+  right: 1.25rem;
+  height: 42px;
+  border-radius: 21px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  color: #aaa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 11px;
+  overflow: hidden;
+  transition: border-color 0.2s, color 0.2s, padding-right 0.3s, gap 0.3s;
+  z-index: 100;
+}
+
+.ideaButton:hover {
+  color: #f0f0f0;
+  border-color: rgba(255, 255, 255, 0.3);
+  gap: 8px;
+  padding-right: 16px;
+}
+
+.ideaIcon {
+  flex-shrink: 0;
+  transition: transform 0.3s;
+}
+
+.ideaLabel {
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-width 0.3s, opacity 0.25s;
+}
+
+.ideaButton:hover .ideaLabel {
+  max-width: 220px;
+  opacity: 1;
+}
+
+/* ---------- Idea Report Modal ---------- */
+.ideaModal {
+  width: 90%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: rgba(30, 30, 40, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  padding: 1.75rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.ideaField {
+  margin-bottom: 0.9rem;
+}
+
+.ideaFieldLabel {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #ccc;
+  margin-bottom: 0.4rem;
+}
+
+.ideaOptional {
+  color: #777;
+  font-weight: 400;
+  font-size: 0.8rem;
+  margin-left: 0.3rem;
+}
+
+.ideaInput {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f0f0f0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.ideaInput:focus {
+  border-color: rgba(102, 126, 234, 0.6);
+}
+
+.ideaInput::placeholder {
+  color: #666;
+}
+
+.ideaErrorText {
+  color: #e74c3c;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}

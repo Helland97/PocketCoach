@@ -37,3 +37,21 @@ EXERCISE_INDEX = {
     'military_press': 4,
 }
 NUM_EXERCISES = len(EXERCISE_INDEX)
+
+# Maps a frontend exercise name to its template file, rep-detection tempo
+# (key into EXERCISE_CONFIGS), and CORE_FEATURES key. Unmapped exercises
+# fall back to DEFAULT_EXERCISE below — which preserves the original
+# squat-only behaviour for anything the UI offers but isn't wired up yet.
+EXERCISE_MAPPING = {
+    'back_squat': {
+        'template': 'front_narrow_template.npz',
+        'tempo': 'heavy_squat',
+        'core_key': 'squat',
+    },
+    'deadlift': {
+        'template': 'deadlift_template.npz',
+        'tempo': 'heavy_squat',
+        'core_key': 'deadlift',
+    },
+}
+DEFAULT_EXERCISE = 'back_squat'

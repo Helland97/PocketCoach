@@ -106,3 +106,7 @@ AI/templates/
 
 # Model research notebooks — scratch work, stay local
 AI/Model_research_notebooks/
+
+# User-submitted ideas (written by the "Report an idea" form) — local only
+ideas/
+Backend/Ideas/

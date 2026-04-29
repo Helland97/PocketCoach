@@ -7,25 +7,33 @@ from Utils.utils.utils import (
     find_rep_boundaries,
     extract_rep_angles,
 )
-from process_landmarks.exercise_config import EXERCISE_CONFIGS, CORE_FEATURES
+from process_landmarks.exercise_config import (
+    EXERCISE_CONFIGS,
+    CORE_FEATURES,
+    EXERCISE_MAPPING,
+    DEFAULT_EXERCISE,
+)
 from process_landmarks.create_embedding import build_embedding
 from process_landmarks.model_config import ACTIVE_MODEL
 
 
-# Cache the loaded model so it's only initialized once
+# Cache the loaded model so it's only initialized once per (model, template) pair.
+# DTW binds a specific template at construction time, so we must re-instantiate
+# when the template changes (e.g. switching between squat and deadlift).
 _cached_model = None
-_cached_model_name = None
+_cached_model_key = None
 
 
-def _load_model(exercise_type):
+def _load_model(template_path):
     """Load the active model based on ACTIVE_MODEL config. Caches the instance."""
-    global _cached_model, _cached_model_name
-    if _cached_model is not None and _cached_model_name == ACTIVE_MODEL:
+    global _cached_model, _cached_model_key
+    key = (ACTIVE_MODEL, template_path)
+    if _cached_model is not None and _cached_model_key == key:
         return _cached_model
 
     if ACTIVE_MODEL == "dtw":
         from process_landmarks.dtw_model import DTWModel
-        _cached_model = DTWModel()
+        _cached_model = DTWModel(template_path=template_path)
     elif ACTIVE_MODEL == "stats_vae":
         from mlp.inference import StatsVAEModel
         _cached_model = StatsVAEModel()
@@ -38,8 +46,8 @@ def _load_model(exercise_type):
     else:
         raise ValueError(f"Unknown model in model_config.py: {ACTIVE_MODEL}")
 
-    _cached_model_name = ACTIVE_MODEL
-    print(f"[Verdict] Loaded model: {ACTIVE_MODEL}")
+    _cached_model_key = key
+    print(f"[Verdict] Loaded model: {ACTIVE_MODEL} (template={template_path})")
     return _cached_model
 
 
@@ -107,19 +115,24 @@ def generate_feedback(rep_result, rep_number):
     return "\n".join(feedback)
 
 
-def analyze_user_video(landmarks, template_path, exercise_type='heavy_squat'):
+def analyze_user_video(landmarks, template_path, exercise='back_squat'):
     """
     Full analysis pipeline: user landmarks -> per-rep comparison -> verdict.
 
     Args:
         landmarks: (T, 33, 3) or (T, 33, 4) numpy array of user MediaPipe landmarks.
         template_path: path to the saved .npz template file (used by DTW model).
-        exercise_type: key into EXERCISE_CONFIGS for rep detection.
+        exercise: frontend exercise name (e.g. "back_squat", "deadlift"). Resolved
+            via EXERCISE_MAPPING into a rep-detection tempo and core-feature key.
 
     Returns:
         dict with n_reps, average_score, and per-rep results + feedback.
     """
-    model = _load_model(exercise_type)
+    mapping = EXERCISE_MAPPING.get(exercise, EXERCISE_MAPPING[DEFAULT_EXERCISE])
+    tempo = mapping['tempo']
+    core_key = mapping['core_key']
+
+    model = _load_model(template_path)
 
     # Use only x,y,z (ignore visibility if present)
     lm = landmarks[:, :, :3] if landmarks.shape[2] > 3 else landmarks
@@ -130,18 +143,16 @@ def analyze_user_video(landmarks, template_path, exercise_type='heavy_squat'):
     # Build the biomechanical embedding (angles + velocity + symmetry + depth)
     embedding, emb_feature_names = build_embedding(smooth, lm)
 
-    # Determine feature names and core features
     feature_names = ANGLE_NAMES
-    exercise_key = 'squat' if 'squat' in exercise_type else exercise_type
-    core_features = CORE_FEATURES.get(exercise_key, CORE_FEATURES.get('squat', []))
+    core_features = CORE_FEATURES.get(core_key, CORE_FEATURES.get('squat', []))
 
-    exercise_config = EXERCISE_CONFIGS[exercise_type]
+    exercise_config = EXERCISE_CONFIGS[tempo]
     reps, _ = find_rep_boundaries(smooth, exercise_config)
     reps_data = extract_rep_angles(smooth, reps)
 
     results = []
     for i, rep in enumerate(reps_data):
-        result = model.score_rep(rep, feature_names, core_features, exercise_type)
+        result = model.score_rep(rep, feature_names, core_features, tempo)
         feedback = generate_feedback(result, i + 1)
         results.append({
             'rep_number': i + 1,

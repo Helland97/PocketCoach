@@ -12,7 +12,7 @@ using System.Text.Json;
 public interface IAiClientConnect{
     HttpClient AiClient {get;}
     Task<string?> Connect(string path);
-    Task<string?> Analyze(string path, string exerciseType = "heavy_squat", string template = "front_narrow_template.npz");
+    Task<(int StatusCode, string Body)> Analyze(string path, string exercise = "back_squat");
 }
 
 public class AiClientConnect : IAiClientConnect{
@@ -43,19 +43,18 @@ public class AiClientConnect : IAiClientConnect{
         }
     }
 
-    public async Task<string?> Analyze(string path, string exerciseType = "heavy_squat", string template = "front_narrow_template.npz"){
+    public async Task<(int StatusCode, string Body)> Analyze(string path, string exercise = "back_squat"){
         try{
-            var url = $"{_pythonBackendUrl}/analyze?path={Uri.EscapeDataString(path)}&exercise_type={exerciseType}&template={template}";
+            var url = $"{_pythonBackendUrl}/analyze?path={Uri.EscapeDataString(path)}&exercise={Uri.EscapeDataString(exercise)}";
             Console.WriteLine($"[.NET] Calling analyze endpoint: {url}");
             using HttpResponseMessage response = await AiClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
             string responseBody = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"[.NET] Analyze response received");
-            return responseBody;
+            Console.WriteLine($"[.NET] Analyze response: {(int)response.StatusCode}");
+            return ((int)response.StatusCode, responseBody);
         }
         catch (HttpRequestException e){
-            Console.WriteLine($"[.NET] Analyze exception: {e.Message}");
-            return null;
+            Console.WriteLine($"[.NET] Analyze network exception: {e.Message}");
+            return (502, $"Python backend unreachable: {e.Message}");
         }
     }
 }
@@ -158,7 +157,7 @@ public class VideoController : ControllerBase{
     [HttpPost("upload")]
     public async Task<IActionResult> UploadAndVerdict(
         IFormFile video,
-        [FromForm] string exercise = "heavy_squat",
+        [FromForm] string exercise = "back_squat",
         [FromForm] string camera_angle = "front_narrow",
         [FromForm] string consent = "false"){
         bool userConsented = consent.Equals("true", StringComparison.OrdinalIgnoreCase);
@@ -199,16 +198,21 @@ public class VideoController : ControllerBase{
             // 3. Run DTW analysis on the generated landmarks
             var analyzeStart = DateTime.Now;
             Console.WriteLine($"[.NET] Calling Python backend for DTW analysis...");
-            string? analysis = await AiClient.Analyze(videoReference.Path);
+            var (analyzeStatus, analyzeBody) = await AiClient.Analyze(videoReference.Path, exercise);
             var analyzeTime = (DateTime.Now - analyzeStart).TotalSeconds;
             Console.WriteLine($"[.NET] DTW analysis completed in {analyzeTime:F2}s");
+
+            if (analyzeStatus < 200 || analyzeStatus >= 300){
+                Console.WriteLine($"[.NET] Analyze failed ({analyzeStatus}): {analyzeBody}");
+                return StatusCode(analyzeStatus, analyzeBody);
+            }
 
             var totalTime = (DateTime.Now - startTime).TotalSeconds;
             Console.WriteLine($"[.NET] Total UploadAndVerdict time: {totalTime:F2}s");
 
             // 4. Parse results
             string verdictJson = verdict?.Value?.ToString() ?? "{}";
-            string analysisJson = analysis ?? "{}";
+            string analysisJson = analyzeBody;
 
             var verdictObj = JsonSerializer.Deserialize<JsonElement>(verdictJson);
             var analysisObj = JsonSerializer.Deserialize<JsonElement>(analysisJson);

@@ -7,6 +7,7 @@ from fastapi import FastAPI, File, UploadFile,  HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse, JSONResponse
 from MediaPipe import MediaPipeVideoProcessor, processing_progress
 from process_landmarks.verdict import analyze_user_video
+from process_landmarks.exercise_config import EXERCISE_MAPPING, DEFAULT_EXERCISE
 import numpy as np
 import time
 import tempfile
@@ -114,37 +115,40 @@ def get_verdict(path: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/analyze", response_class=JSONResponse)
-def analyze_landmarks(path: str, exercise_type: str = "heavy_squat",
-                      template: str = "front_narrow_template.npz"):
+def analyze_landmarks(path: str, exercise: str = DEFAULT_EXERCISE):
     """
     Runs after /verdict. Takes the same video path, loads the landmarks
     that MediaPipe saved, creates an embedding, runs DTW analysis against
-    the chosen template, and returns the verdict.
+    the template for the requested exercise, and returns the verdict.
     """
-    
+
     start_time = time.time()
     try:
+        mapping = EXERCISE_MAPPING.get(exercise, EXERCISE_MAPPING[DEFAULT_EXERCISE])
+        template_filename = mapping['template']
+
         # Derive landmarks path from the video path (same logic as MediaPipe.py)
         base_name = os.path.splitext(os.path.basename(path))[0]
         landmarks_path = os.path.join("MediaPipe_landmarks", base_name + "_landmarks.npy")
-        template_path = os.path.join("templates", template)
+        template_path = os.path.join("templates", template_filename)
 
         print(f"[Analyze] Received request - video: {path}")
+        print(f"[Analyze] Exercise: {exercise} -> template: {template_filename}, tempo: {mapping['tempo']}")
         print(f"[Analyze] Landmarks: {landmarks_path}")
         print(f"[Analyze] Template: {template_path}")
-        print(f"[Analyze] Exercise type: {exercise_type}")
 
         if not os.path.exists(landmarks_path):
             raise HTTPException(status_code=404,
                                 detail=f"Landmarks not found: {landmarks_path}")
         if not os.path.exists(template_path):
-            raise HTTPException(status_code=404,
-                                detail=f"Template not found: {template_path}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template not found for exercise '{exercise}': {template_path}")
 
         landmarks = np.load(landmarks_path)
         print(f"[Analyze] [{time.time()-start_time:.2f}s] Loaded landmarks: {landmarks.shape}")
 
-        result = analyze_user_video(landmarks, template_path, exercise_type)
+        result = analyze_user_video(landmarks, template_path, exercise)
 
         # Extract the embedding numpy array, encode as base64 for JSON transport
         embedding = result.pop('embedding')
