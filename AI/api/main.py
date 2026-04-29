@@ -1,7 +1,6 @@
 import os
 import base64
 import json
-from typing import Annotated
 from io import BytesIO
 from fastapi import FastAPI, File, UploadFile,  HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse, JSONResponse

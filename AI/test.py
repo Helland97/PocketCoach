@@ -29,10 +29,9 @@ if __name__ == "__main__":
         from process_landmarks.create_embedding import create_embedding_from_landmarks
         from process_landmarks.create_template import load_template
         from process_landmarks.dtw_analysis import compare_rep_to_template
-        from process_landmarks.verdict import generate_feedback, analyze_user_video
+        from process_landmarks.verdict import analyze_user_video
         from process_landmarks.exercise_config import EXERCISE_CONFIGS
         from Utils.utils.utils import (
-            smooth_angles,
             find_rep_boundaries,
             extract_rep_angles,
         )

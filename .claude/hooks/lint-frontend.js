@@ -17,7 +17,7 @@ try {
 }
 
 const filePath = input?.tool_input?.file_path || "";
-const isFrontend = /[\\/]frontend[\\/]/.test(filePath);
+const isFrontend = /(^|[\\/])frontend[\\/]/.test(filePath);
 if (!isFrontend) process.exit(0);
 
 const lintable = /\.(ts|tsx|js|jsx|mjs|cjs)$/i.test(filePath);

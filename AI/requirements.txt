@@ -15,3 +15,6 @@ dtw-python==1.5.3
 
 # Additional dependencies for production
 pydantic==2.11.7
+
+# Linting (used by .claude/hooks/lint-python.js)
+ruff==0.15.12

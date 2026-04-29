@@ -22,7 +22,7 @@ if __name__ == "__main__":
         marker = "  <-- SELECTED" if f == USER_LANDMARK_FILE else ""
         print(f"  {f}{marker}")
 
-    print(f"\nAvailable template files:")
+    print("\nAvailable template files:")
     for f in sorted(os.listdir(TEMPLATES_DIR)):
         marker = "  <-- SELECTED" if f == TEMPLATE_FILE else ""
         print(f"  {f}{marker}")
@@ -34,13 +34,11 @@ if __name__ == "__main__":
         from process_landmarks.create_embedding import create_embedding_from_landmarks
         from process_landmarks.create_template import load_template
         from process_landmarks.dtw_analysis import compare_rep_to_template
-        from process_landmarks.verdict import generate_feedback, analyze_user_video
+        from process_landmarks.verdict import analyze_user_video
         from process_landmarks.exercise_config import EXERCISE_CONFIGS
         from Utils.utils.utils import (
-            smooth_angles,
             find_rep_boundaries,
             extract_rep_angles,
-            ANGLE_NAMES,
         )
 
         user_path = os.path.join(LANDMARKS_DIR, USER_LANDMARK_FILE)
@@ -124,6 +122,6 @@ if __name__ == "__main__":
         print("Done!")
 
     except Exception as e:
-        print(f"\nAn error occurred:")
+        print("\nAn error occurred:")
         print(e)
         traceback.print_exc()

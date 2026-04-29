@@ -53,7 +53,7 @@ class SquatCounter(ExerciseCounter):
             # update prev_angle
             self.prev_angle = anatomical_angle
 
-        except Exception as e:
+        except Exception:
             # handle missing landmarks etc.
             # print("update error:", e)
             pass

@@ -7,6 +7,20 @@
           {
             "type": "command",
             "command": "node .claude/hooks/lint-frontend.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/lint-python.js"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/build-dotnet.js"
           }
         ]
       }
