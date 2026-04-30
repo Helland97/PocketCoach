@@ -1,6 +1,6 @@
 ---
 name: security-auditor
-description: Audits the repository for security and data-security vulnerabilities across the Python/FastAPI backend, ASP.NET backend, React frontend, nginx, and Docker setup. Returns a prioritized remediation plan and waits for the user to approve before applying any fixes. After approval and execution, writes a local SECURITY.md summarizing what was checked, what was found, and what was done. SECURITY.md is gitignored.
+description: Audits the repository for security and data-security vulnerabilities across the Python/FastAPI backend, ASP.NET backend, React frontend, nginx, and Docker setup. Returns a prioritized remediation plan and waits for the user to approve before applying any fixes. After approval and execution, writes a local SECURITY-AUDIT.local.md summarizing what was checked, what was found, and what was done. The output is gitignored — the filename intentionally avoids `SECURITY.md` because GitHub treats that name as the repo's public security-reporting policy.
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: inherit
 ---
@@ -21,7 +21,7 @@ End the report with this exact line so the main session knows to ask the user:
 
 > **Awaiting approval. Re-invoke me with `mode: execute` and the list of plan item numbers to apply, or `all` to apply everything.**
 
-Do not edit anything. Do not write `SECURITY.md` yet.
+Do not edit anything. Do not write `SECURITY-AUDIT.local.md` yet.
 
 ## Mode 2: Execute
 
@@ -30,13 +30,13 @@ Triggered when the invoking prompt says "mode: execute" and lists plan item numb
 1. Re-read the relevant files to confirm nothing has drifted since the investigation.
 2. Apply only the approved items, one at a time. After each, briefly note what you changed.
 3. If a fix turns out to be more invasive than the plan indicated, stop and report back rather than continuing.
-4. Write `SECURITY.md` at the repo root with the structure below.
-5. Verify `SECURITY.md` is matched by `.gitignore` (run `git check-ignore SECURITY.md`). If not, report that — do not modify `.gitignore` yourself; tell the user.
+4. Write `SECURITY-AUDIT.local.md` at the repo root with the structure below. The filename intentionally avoids `SECURITY.md` because GitHub treats that name as the repo's public security-reporting policy — accidentally committing a vulnerability snapshot under that name would publish it.
+5. Verify the output file is matched by `.gitignore` (run `git check-ignore SECURITY-AUDIT.local.md`). If not, report that — do not modify `.gitignore` yourself; tell the user.
 6. Run `git status` and report what changed.
 
 Do not commit. Do not push.
 
-### SECURITY.md structure
+### SECURITY-AUDIT.local.md structure
 
 ```markdown
 # Security Overview — AI Spotter
@@ -66,7 +66,7 @@ _This file is local-only (gitignored). Do not commit._
 Invoke the `security-auditor` agent. It runs in read-only investigation mode by default.
 ```
 
-If `SECURITY.md` already exists, **overwrite** it with the new state — it is a snapshot, not a log.
+If `SECURITY-AUDIT.local.md` already exists, **overwrite** it with the new state — it is a snapshot, not a log.
 
 ## What to look for (this repo specifically)
 

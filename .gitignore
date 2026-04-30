@@ -111,5 +111,7 @@ AI/Model_research_notebooks/
 ideas/
 Backend/Ideas/
 
-# Security audit snapshot — written by the security-auditor agent, local only
-SECURITY.md
+# Security audit snapshot — written by the security-auditor agent, local only.
+# Named *.local.md to avoid colliding with GitHub's SECURITY.md convention
+# (which is the repo's public security-reporting policy).
+SECURITY-AUDIT.local.md
