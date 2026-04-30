@@ -110,3 +110,6 @@ AI/Model_research_notebooks/
 # User-submitted ideas (written by the "Report an idea" form) — local only
 ideas/
 Backend/Ideas/
+
+# Security audit snapshot — written by the security-auditor agent, local only
+SECURITY.md
