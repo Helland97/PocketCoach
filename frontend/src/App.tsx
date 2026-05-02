@@ -284,15 +284,13 @@ export default function App() {
             setBusy(true);
             setError(null);
 
-            if (videoUrl){
-                const vidRes = await fetch(videoUrl);
-                if (!vidRes.ok){
-                    throw new Error("Video could not be fetched");
-                }
-                const vidBlob = await vidRes.blob();
-
+            if (video?.id){
+                // Reference the already-uploaded video by id — do not
+                // re-transfer the blob. The backend looks up the stored
+                // file under its Videos/ mount and forwards the server-side
+                // path to the Python backend.
                 const formData = new FormData();
-                formData.append('video', vidBlob, 'video.mp4');
+                formData.append('videoId', String(video.id));
                 formData.append('exercise', exercise!);
                 formData.append('camera_angle', cameraAngle!);
                 formData.append('consent', String(dataConsent === true));

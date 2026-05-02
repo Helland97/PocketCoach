@@ -1,5 +1,6 @@
 # Stage 1: Build
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+# Pinned to the 9.0.100 SDK on Debian 12 (bookworm) for reproducibility.
+FROM mcr.microsoft.com/dotnet/sdk:9.0.100-bookworm-slim AS build
 
 WORKDIR /src
 
@@ -16,20 +17,25 @@ FROM build AS publish
 RUN dotnet publish "AI-spotter.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 3: Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+# Pinned to the 9.0.0 ASP.NET runtime on Debian 12 (bookworm).
+FROM mcr.microsoft.com/dotnet/aspnet:9.0.0-bookworm-slim AS final
 
 WORKDIR /app
 
-# Create directories for video storage and database
-RUN mkdir -p Videos ProcessedVideos Data Landmarks
+# The aspnet:9.0 base image already ships a non-root `app` user (UID 1654).
+# Pre-create the writable directories and hand them to that user before USER app.
+RUN mkdir -p Videos ProcessedVideos Data Landmarks \
+    && chown -R app:app /app
 
 # Copy published app
-COPY --from=publish /app/publish .
+COPY --from=publish --chown=app:app /app/publish .
 
 # Expose port
 EXPOSE 8080
 
 # Set environment variables
 ENV ASPNETCORE_URLS=http://+:8080
+
+USER app
 
 ENTRYPOINT ["dotnet", "AI-spotter.dll"]

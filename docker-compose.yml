@@ -17,8 +17,12 @@ services:
     build:
       context: ./Backend
       dockerfile: Dockerfile.dotnet
-    ports:
-      - "5246:8080"
+    # Internal only — reachable from the frontend container over app-network.
+    # Uncomment the ports block below to debug from the host.
+    # ports:
+    #   - "127.0.0.1:5246:8080"
+    expose:
+      - "8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
@@ -40,8 +44,12 @@ services:
     build:
       context: ./AI
       dockerfile: Dockerfile.python
-    ports:
-      - "8000:8000"
+    # Internal only — reachable from the .NET / frontend containers.
+    # Uncomment the ports block below to debug from the host.
+    # ports:
+    #   - "127.0.0.1:8000:8000"
+    expose:
+      - "8000"
     environment:
       - PYTHONUNBUFFERED=1
     volumes:

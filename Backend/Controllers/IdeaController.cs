@@ -31,6 +31,20 @@ public class IdeaController : ControllerBase
             return BadRequest(new { error = "Title and description are required." });
         }
 
+        // Length caps. ASP.NET model validation also enforces these via the
+        // [StringLength] attributes on IdeaSubmission, but we re-check here
+        // so the error message is consistent and we never write an oversized
+        // record to ideas.json on disk.
+        if (submission.Title!.Length > IdeaLimits.TitleMax
+            || (submission.Category?.Length ?? 0) > IdeaLimits.CategoryMax
+            || (submission.AffectedArea?.Length ?? 0) > IdeaLimits.AffectedAreaMax
+            || submission.Description!.Length > IdeaLimits.DescriptionMax
+            || (submission.Problem?.Length ?? 0) > IdeaLimits.ProblemMax
+            || (submission.Acceptance?.Length ?? 0) > IdeaLimits.AcceptanceMax)
+        {
+            return BadRequest(new { error = "One or more fields exceed the allowed length." });
+        }
+
         var idea = new Idea
         {
             Id = $"idea-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}",
