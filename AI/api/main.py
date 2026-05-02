@@ -1,8 +1,10 @@
 import os
+import re
 import base64
 import json
 from io import BytesIO
 from fastapi import FastAPI, File, UploadFile,  HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse, JSONResponse
 from MediaPipe import MediaPipeVideoProcessor, processing_progress
 from process_landmarks.verdict import analyze_user_video
@@ -14,8 +16,70 @@ import traceback
 
 
 app = FastAPI()
+
+# CORS — this service is only reached through nginx on the internal Docker
+# network. Restrict to the in-cluster origins so a browser cannot call the
+# Python backend directly even if the port were ever exposed.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost",
+        "http://localhost:80",
+        "http://frontend",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
 # Dictionary to store uploaded videos in memory (filename -> BytesIO buffer)
 video_store = {}
+
+# Allowed roots for path-bound endpoints. Anything outside these is rejected.
+# Resolved at import time relative to the working directory uvicorn was launched
+# from (AI/ in dev, /app in the container).
+_ALLOWED_VIDEO_ROOTS = (
+    os.path.realpath("Videos"),
+    os.path.realpath("ProcessedVideos"),
+)
+_ALLOWED_LANDMARK_ROOT = os.path.realpath("MediaPipe_landmarks")
+_ALLOWED_TEMPLATE_ROOT = os.path.realpath("templates")
+_ALLOWED_PROCESSED_ROOT = os.path.realpath("ProcessedVideos")
+_ALLOWED_UPLOAD_ROOT = os.path.realpath("uploaded")
+
+# Filenames stored on disk are GUIDs from .NET (lowercase hex with dashes,
+# optional .mp4/.gif extension). Anything else is rejected.
+_SAFE_FILENAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+
+
+def _safe_filename(name: str) -> str:
+    """Return name if it is a plain filename with no path components, else 400."""
+    if not name or "\x00" in name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    base = os.path.basename(name)
+    if base != name or base in ("", ".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not _SAFE_FILENAME_RE.match(base):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    return base
+
+
+def _resolve_within(root: str, candidate: str) -> str:
+    """Resolve candidate and ensure it lives under root. Raises 400 otherwise."""
+    full = os.path.realpath(candidate)
+    root_real = os.path.realpath(root)
+    if full != root_real and not full.startswith(root_real + os.sep):
+        raise HTTPException(status_code=400, detail="Path escapes allowed root")
+    return full
+
+
+def _resolve_within_any(roots, candidate: str) -> str:
+    full = os.path.realpath(candidate)
+    for root in roots:
+        root_real = os.path.realpath(root)
+        if full == root_real or full.startswith(root_real + os.sep):
+            return full
+    raise HTTPException(status_code=400, detail="Path escapes allowed root")
 
 
 # POST ----------------------------------------------------------------------
@@ -26,7 +90,8 @@ video_store = {}
 # Only the filename is returned in the response.
 @app.post("/uploadfile/")
 async def create_upload_file(file: UploadFile):
-    return {"filename": file.filename}
+    safe = _safe_filename(file.filename or "")
+    return {"filename": safe}
 
 
 # 📤 POST endpoint to upload a video without any processing.
@@ -36,12 +101,13 @@ async def create_upload_file(file: UploadFile):
 async def upload_video(file: UploadFile):
     upload_dir = "uploaded"
     os.makedirs(upload_dir, exist_ok=True)  # Create folder if it doesn't exist
-    file_path = os.path.join(upload_dir, file.filename)
+    safe = _safe_filename(file.filename or "")
+    file_path = _resolve_within(upload_dir, os.path.join(upload_dir, safe))
 
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    return {"filename": file.filename, "status": "uploaded"}
+    return {"filename": safe, "status": "uploaded"}
 
 
 # 📤 POST endpoint to upload a video and store it in memory.
@@ -50,16 +116,18 @@ async def upload_video(file: UploadFile):
 # Returns the filename and status confirmation.
 @app.post("/upload_in_memory/")
 async def upload_in_memory(file: UploadFile):
+    safe = _safe_filename(file.filename or "")
     content = await file.read()
-    video_store[file.filename] = BytesIO(content)
-    return {"filename": file.filename, "status": "stored in memory"}
+    video_store[safe] = BytesIO(content)
+    return {"filename": safe, "status": "stored in memory"}
 
 
 
 @app.post("/process_in_memory/{filename}")
 async def process_in_memory(filename: str):
     # 1. Get the uploaded video from memory
-    video = video_store.get(filename)
+    safe = _safe_filename(filename)
+    video = video_store.get(safe)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found in memory")
     video.seek(0)
@@ -91,27 +159,32 @@ def get_verdict(path: str):
 
     start_time = time.time()
     try:
-        print(f"[{time.time()-start_time:.2f}s] Received verdict request for path: {path}")
+        # Constrain to the shared video volumes (Videos/ or ProcessedVideos/).
+        safe_path = _resolve_within_any(_ALLOWED_VIDEO_ROOTS, path)
+        print(f"[{time.time()-start_time:.2f}s] Received verdict request for path: {safe_path}")
         print(f"Current working directory: {os.getcwd()}")
 
         # Check if file exists
-        if not os.path.exists(path):
-            print(f"ERROR: File not found at path: {path}")
-            raise HTTPException(status_code=404, detail=f"Video file not found at: {path}")
+        if not os.path.exists(safe_path):
+            print(f"ERROR: File not found at path: {safe_path}")
+            raise HTTPException(status_code=404, detail="Video file not found")
 
-        file_size_mb = os.path.getsize(path) / (1024 * 1024)
+        file_size_mb = os.path.getsize(safe_path) / (1024 * 1024)
         print(f"[{time.time()-start_time:.2f}s] File exists ({file_size_mb:.2f} MB), starting processing...")
 
         processor = MediaPipeVideoProcessor()
-        result = processor.process_video(path, path)
+        result = processor.process_video(safe_path, safe_path)
 
         print(f"[{time.time()-start_time:.2f}s] Processing complete. Total time: {time.time()-start_time:.2f}s")
         print(f"Result: {result}")
         return result
+    except HTTPException:
+        raise
     except Exception as e:
+        # Log full detail server-side, but do not leak it to the caller.
         print(f"ERROR in get_verdict after {time.time()-start_time:.2f}s: {str(e)}")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/analyze", response_class=JSONResponse)
 def analyze_landmarks(path: str, exercise: str = DEFAULT_EXERCISE):
@@ -123,26 +196,36 @@ def analyze_landmarks(path: str, exercise: str = DEFAULT_EXERCISE):
 
     start_time = time.time()
     try:
-        mapping = EXERCISE_MAPPING.get(exercise, EXERCISE_MAPPING[DEFAULT_EXERCISE])
+        # Validate exercise against the static mapping rather than trusting input.
+        if exercise not in EXERCISE_MAPPING:
+            raise HTTPException(status_code=400, detail="Unknown exercise")
+        mapping = EXERCISE_MAPPING[exercise]
         template_filename = mapping['template']
 
-        # Derive landmarks path from the video path (same logic as MediaPipe.py)
-        base_name = os.path.splitext(os.path.basename(path))[0]
-        landmarks_path = os.path.join("MediaPipe_landmarks", base_name + "_landmarks.npy")
-        template_path = os.path.join("templates", template_filename)
+        # Reduce the incoming path to a basename, validate it, then rebuild
+        # within trusted roots.
+        raw_basename = os.path.basename(path)
+        if not raw_basename or "\x00" in raw_basename or ".." in raw_basename:
+            raise HTTPException(status_code=400, detail="Invalid path")
+        base_name = os.path.splitext(raw_basename)[0]
+        if not _SAFE_FILENAME_RE.match(base_name):
+            raise HTTPException(status_code=400, detail="Invalid path")
+        landmarks_path = _resolve_within(
+            _ALLOWED_LANDMARK_ROOT,
+            os.path.join("MediaPipe_landmarks", base_name + "_landmarks.npy"),
+        )
+        template_path = _resolve_within(
+            _ALLOWED_TEMPLATE_ROOT,
+            os.path.join("templates", _safe_filename(template_filename)),
+        )
 
-        print(f"[Analyze] Received request - video: {path}")
+        print(f"[Analyze] Received request - video basename: {base_name}")
         print(f"[Analyze] Exercise: {exercise} -> template: {template_filename}, tempo: {mapping['tempo']}")
-        print(f"[Analyze] Landmarks: {landmarks_path}")
-        print(f"[Analyze] Template: {template_path}")
 
         if not os.path.exists(landmarks_path):
-            raise HTTPException(status_code=404,
-                                detail=f"Landmarks not found: {landmarks_path}")
+            raise HTTPException(status_code=404, detail="Landmarks not found")
         if not os.path.exists(template_path):
-            raise HTTPException(
-                status_code=404,
-                detail=f"Template not found for exercise '{exercise}': {template_path}")
+            raise HTTPException(status_code=404, detail="Template not found for exercise")
 
         landmarks = np.load(landmarks_path)
         print(f"[Analyze] [{time.time()-start_time:.2f}s] Loaded landmarks: {landmarks.shape}")
@@ -167,10 +250,10 @@ def analyze_landmarks(path: str, exercise: str = DEFAULT_EXERCISE):
     except HTTPException:
         raise
     except Exception as e:
+        # Log full detail server-side, but return a generic message.
         print(f"[Analyze] ERROR after {time.time()-start_time:.2f}s: {str(e)}")
-    
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.post("/process_video/")
@@ -208,12 +291,14 @@ async def get_progress():
 # This can be used to visually test whether the uploaded video is viewable in the browser.
 @app.get("/watch/{filename}", response_class=HTMLResponse)
 def watch_video_page(filename: str):
+    # Validate before reflecting into HTML to prevent XSS via filename.
+    safe = _safe_filename(filename)
     return f"""
     <html>
         <body>
-            <h2>Watching: {filename}</h2>
+            <h2>Watching: {safe}</h2>
             <video width="640" height="480" controls>
-                <source src="/view/{filename}" type="video/mp4">
+                <source src="/view/{safe}" type="video/mp4">
                 Your browser does not support the video tag.
             </video>
         </body>
@@ -226,7 +311,8 @@ def watch_video_page(filename: str):
 # Raises 404 error if the video is not found in memory.
 @app.get("/view_in_memory/{filename}")
 def stream_in_memory(filename: str):
-    video = video_store.get(filename)
+    safe = _safe_filename(filename)
+    video = video_store.get(safe)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found in memory")
     video.seek(0)  # Reset read pointer to start
@@ -236,10 +322,16 @@ def stream_in_memory(filename: str):
 
 @app.get("/view_processed/{filename:path}")
 def view_processed_file(filename: str):
-    # filename already contains the full path (e.g., "ProcessedVideos/video.mp4")
-    if not os.path.exists(filename):
-        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
-    return FileResponse(filename, media_type="video/mp4")
+    # The frontend passes a relative path like "ProcessedVideos/<guid>.mp4".
+    # Strip the directory portion and rebuild within the ProcessedVideos root.
+    base = _safe_filename(os.path.basename(filename))
+    full_path = _resolve_within(
+        _ALLOWED_PROCESSED_ROOT,
+        os.path.join(_ALLOWED_PROCESSED_ROOT, base),
+    )
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(full_path, media_type="video/mp4")
 
 
 

@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# Pinned patch + base distro for reproducibility.
+FROM python:3.11.10-slim-bookworm
 
 WORKDIR /app
 
@@ -21,6 +22,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Pre-fetch MediaPipe pose models while still root. MediaPipe lazily downloads
+# .tflite files into its own site-packages directory on first Pose() call,
+# which fails at runtime under a non-root user (EACCES on site-packages).
+# Instantiating Pose() at both complexities the app uses triggers the download
+# now and bakes the models into the image.
+RUN python -c "import mediapipe as mp; mp.solutions.pose.Pose(model_complexity=2); mp.solutions.pose.Pose(model_complexity=1)"
+
 # Copy Python modules
 COPY MediaPipe.py ./
 COPY process_landmarks/ ./process_landmarks/
@@ -33,14 +41,28 @@ COPY Utils/ ./Utils/
 # Copy the FastAPI app (uvicorn entry point)
 COPY api/ ./api/
 
-# Create necessary directories
-RUN mkdir -p Videos ProcessedVideos MediaPipe_landmarks
+# Create necessary directories and a non-root user that owns /app.
+# UID/GID 1654 deliberately matches the `app` user that the .NET aspnet:9.0
+# base image ships, so files written into shared named volumes
+# (video-storage, processed-storage) by either backend are writable by the other.
+RUN mkdir -p Videos ProcessedVideos MediaPipe_landmarks uploaded \
+    && groupadd --system --gid 1654 app \
+    && useradd --system --uid 1654 --gid app --no-create-home --shell /usr/sbin/nologin app \
+    && chown -R app:app /app
 
 # Expose port
 EXPOSE 8000
 
-# Set Python to run in unbuffered mode for better logging
-ENV PYTHONUNBUFFERED=1
+# Set Python to run in unbuffered mode for better logging.
+# HOME / MPLCONFIGDIR point at /tmp because the non-root `app` user has no
+# home directory; without this matplotlib and fontconfig spam EACCES warnings
+# trying to create caches under /home/app.
+ENV PYTHONUNBUFFERED=1 \
+    HOME=/tmp \
+    MPLCONFIGDIR=/tmp/matplotlib \
+    XDG_CACHE_HOME=/tmp/.cache
+
+USER app
 
 # Run the FastAPI application
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

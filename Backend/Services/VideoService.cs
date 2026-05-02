@@ -4,12 +4,12 @@ using AI_spotter.Models;
 public class VideoService(){
     static List<Video> Videos { get; }
 
-    static int currId = 3;
+    // Start IDs at 1; no seeded fake entries (the previous "temp/Vid_*"
+    // placeholders pointed at nonexistent paths and caused GetAI / Analyze
+    // to forward bogus paths to the Python backend).
+    static int currId = 1;
     static VideoService(){
-        Videos = new List<Video>{
-        new Video{Id = 1, Path = "temp/Vid_1"},
-        new Video{Id = 2, Path = "temp/Vid_2"}
-        };
+        Videos = new List<Video>();
     }
 
     public static List<Video> GetAll() => Videos;

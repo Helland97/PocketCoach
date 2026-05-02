@@ -54,13 +54,22 @@ _This file is local-only (gitignored). Do not commit._
 - <bullet per active control: what + where in the repo>
 
 ## Recent fixes (this audit)
-- <bullet per applied plan item: finding → fix → file(s) touched>
+For each applied plan item, include all four:
+- **Finding** — the original title and severity
+- **Why it was a threat** — 1–2 sentences on the concrete attack/abuse scenario, what an attacker (or buggy client) could achieve, and what they would need to trigger it. Be specific to this codebase, not generic OWASP language.
+- **Fix** — what was changed
+- **File(s) touched** — paths
 
 ## Known accepted risks
-- <bullet per finding the user explicitly chose to defer, with reason>
+For each deferred finding, include:
+- **Finding** — title and severity
+- **Why it is a threat** — 1–2 sentences as above
+- **Reason for deferral** — user's stated reason (e.g. localhost-only, planned for later)
 
 ## Not yet addressed
-- <bullet per finding still open, with severity>
+For each open finding, include:
+- **Finding** — title and severity
+- **Why it is a threat** — 1–2 sentences as above
 
 ## How to re-run
 Invoke the `security-auditor` agent. It runs in read-only investigation mode by default.
