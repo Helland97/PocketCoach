@@ -1,0 +1,66 @@
+# knowledge.yaml — Knowledge Context Protocol manifest
+# Spec: https://cantara.github.io/knowledge-context-protocol/
+#
+# AI agents: read this FIRST when opening this repo. It indexes everything
+# you need to navigate the project without exploring blindly.
+
+schema_version: "1.0"
+
+project:
+  name: "AI Spotter (PocketCoach)"
+  description: >-
+    AI-powered exercise form analysis. Upload a lift video, MediaPipe extracts
+    pose landmarks, DTW compares them against a pro template, user gets per-rep
+    grades + feedback. Scoped to squat variations.
+  type: "web-app"
+
+knowledge:
+  primary_context:
+    - path: CLAUDE.md
+      description: "Stack, run/build commands, repo layout, per-service conventions, execution notes for Claude. Read first."
+      priority: critical
+
+  architecture:
+    - path: ARCHITECTURE.md
+      description: "System architecture: services, data flow, shared volumes between containers."
+      priority: high
+    - path: DOCKER_SETUP.md
+      description: "Docker compose setup, service ports, volume layout, troubleshooting."
+      priority: high
+    - path: docker-compose.yml
+      description: "Service definitions, ports, volume mounts — authoritative for inter-container paths."
+      priority: medium
+    - path: README.md
+      description: "User-facing overview, quick start, prerequisites."
+      priority: medium
+
+  skills:
+    - path: .claude/skills/
+      description: >-
+        Project skills as flat `.yaml` files (one skill = one file, SDD style):
+        add-new-exercise.yaml (wire a new lift end-to-end across Python/.NET/frontend),
+        build-template-from-video.yaml (build a DTW .npz template from a pro reference).
+        Convention: keep all project skills in YAML format for consistency.
+      priority: high
+    - path: .claude/commands/
+      description: >-
+        Slash commands: pr (pre-flight + commit + push + PR), security-audit,
+        train-and-summarize (run VAE training notebooks), investigate-training-data,
+        reported_idea (pick and implement a user-reported idea).
+      priority: high
+    - path: .claude/agents/
+      description: "Subagents: security-auditor (full-repo audit), training-data-investigator (read-only data inspection)."
+      priority: medium
+
+  learning:
+    - path: LEARNINGS.md
+      description: >-
+        Ongoing log: what worked / what didn't. Model experiments, template-building
+        gotchas, DTW tuning, container-path mismatches. Append as you go.
+      priority: medium
+      optional: true
+
+  config:
+    - path: .claude/settings.json
+      description: "Project Claude Code settings (permissions, hooks)."
+      priority: low

@@ -1,0 +1,139 @@
+name: build-template-from-video
+description: Build a DTW reference template (.npz) for an exercise from a pro reference video. Use when the user says "build the X template", "create a template from this video", "generate a new pro reference for X", or asks to run the MediaPipe → create_template pipeline end-to-end. Typically runs after /investigate-training-data has produced a prep plan.
+version: 1.0.0
+
+instructions: |
+  # Build a DTW template from a pro reference video
+
+  End-to-end recipe: pose extraction → angle features → rep segmentation → template aggregation → `.npz` on disk → wiring check. The user has usually already produced a prep plan (via `/investigate-training-data` or by hand) that names the source video, tempo preset, method, and core features. If they haven't, ask them — do not guess.
+
+  ## Prerequisites
+
+  Before running anything, confirm:
+
+  1. The user has a pro reference video file. Path is required input. Acceptable: `.mp4`, `.mov`, `.avi`. Typical location: `AI/training_data/<exercise>/`.
+  2. The exercise has an entry in `AI/process_landmarks/exercise_config.py` — either in `EXERCISE_MAPPING` (already wired) or at minimum in `EXERCISE_INDEX` + `CORE_FEATURES`. If the exercise is brand new, stop and route the user to the `add-new-exercise` skill first.
+  3. Python venv at `AI/venv/` is active, or the user is running inside the `python-backend` Docker container. Working directory must be `AI/` so relative paths (`templates/`, `MediaPipe_landmarks/`) resolve.
+  4. `requirements.txt` deps installed (`mediapipe`, `numpy`, `opencv-python`, `scipy`, `dtw-python`).
+
+  ## Required parameters (ask if missing)
+
+  - **`video_path`** — absolute or `AI/`-relative path to the source video.
+  - **`exercise`** — key in `EXERCISE_MAPPING` (e.g. `back_squat`, `deadlift`). Determines defaults below.
+  - **`tempo`** — one of `heavy_squat`, `bodyweight_squat`, `jump_squat`, `adaptive` (`EXERCISE_CONFIGS` keys). Default: `heavy_squat` for barbell lifts.
+  - **`method`** — `first`, `best`, or `average`. Default: `best` if the video has 3+ reps; `first` if only 1–2.
+  - **`core_features_key`** — `squat`, `deadlift`, `benchpress`, or `military_press` (`CORE_FEATURES` keys). For `front_squat`, use `squat`.
+  - **`output_name`** — filename for `AI/templates/<output_name>.npz`. Convention: `<descriptor>_template.npz` (e.g. `front_narrow_template.npz`, `deadlift_template.npz`).
+  - **`target_length`** — frame count for `average` method only. Default: `100`.
+
+  ## Pipeline (execute in order)
+
+  ### Step 1 — Extract landmarks
+  Run from `AI/`:
+
+  ```python
+  import os, numpy as np, cv2, mediapipe as mp
+
+  video_path = "<video_path>"
+  base_name = os.path.splitext(os.path.basename(video_path))[0]
+  npy_path = os.path.join("MediaPipe_landmarks", base_name + "_landmarks.npy")
+  os.makedirs("MediaPipe_landmarks", exist_ok=True)
+
+  cap = cv2.VideoCapture(video_path)
+  landmarks_data = []
+  with mp.solutions.pose.Pose(
+      static_image_mode=False, model_complexity=2,
+      enable_segmentation=False,
+      min_detection_confidence=0.85, min_tracking_confidence=0.85,
+  ) as pose:
+      while True:
+          ok, frame = cap.read()
+          if not ok: break
+          res = pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+          if res.pose_landmarks:
+              landmarks_data.append(np.array(
+                  [[lm.x, lm.y, lm.z, lm.visibility] for lm in res.pose_landmarks.landmark]
+              ))
+  cap.release()
+
+  landmarks = np.stack(landmarks_data)  # (T, 33, 4)
+  np.save(npy_path, landmarks)
+  print(f"Saved {landmarks.shape} to {npy_path}")
+  ```
+
+  Verify: `landmarks.shape[0] >= 30` (at least one second at 30fps), `landmarks.shape[1] == 33`, detected ratio ≥ 90% (poor detection means bad lighting/occlusion → ask user to re-shoot).
+
+  If the user already has the `.npy` (e.g. processed via the running FastAPI service), skip this step and just `np.load(npy_path)`.
+
+  ### Step 2 — Build template
+
+  ```python
+  import sys; sys.path.insert(0, ".")  # if running from AI/
+  from process_landmarks.create_template import (
+      create_template_from_landmarks, save_template,
+  )
+  from process_landmarks.exercise_config import CORE_FEATURES
+
+  template, info = create_template_from_landmarks(
+      landmarks,
+      exercise_type="<tempo>",                   # heavy_squat | bodyweight_squat | jump_squat | adaptive
+      method="<method>",                          # first | best | average
+      target_length=<target_length>,              # only used for average
+      core_features_list=CORE_FEATURES["<core_features_key>"],
+  )
+  print(info)  # n_reps_available, method, rep_used or n_reps_averaged
+  ```
+
+  Sanity-check `info`:
+  - `n_reps_available` ≥ 1. Zero means rep segmentation failed — usually wrong tempo preset for the video. Try `adaptive` or a different preset and re-run.
+  - For `best`, surface `rep_scores` so the user can confirm the chosen rep is plausible.
+  - `template.shape` should be `(<frames>, D)` where D matches `len(ANGLE_NAMES)` from `Utils.utils.utils`.
+
+  ### Step 3 — Save
+
+  ```python
+  save_template(
+      template, info,
+      save_path=os.path.join("templates", "<output_name>"),
+      ref_name=base_name,
+      exercise="<exercise>",
+      core_features_list=CORE_FEATURES["<core_features_key>"],
+  )
+  ```
+
+  This writes `AI/templates/<output_name>` with all metadata fields documented in `create_template.save_template`.
+
+  ### Step 4 — Verify on disk
+
+  ```python
+  from process_landmarks.create_template import load_template
+  t, fnames, core = load_template(os.path.join("templates", "<output_name>"))
+  print("template:", t.shape, "features:", len(fnames), "core:", core)
+  ```
+
+  Confirm shape and that `core` matches what was passed in.
+
+  ### Step 5 — Wire it up (only if new)
+
+  If `<exercise>` is already in `EXERCISE_MAPPING` and points to `<output_name>`, you're done.
+
+  If you just created a new template file *for an existing mapping*, just confirm the filename matches what `EXERCISE_MAPPING[<exercise>]['template']` says — rename the file or update the mapping, but pick one and tell the user which.
+
+  If `EXERCISE_MAPPING[<exercise>]` does not exist, you should not have gotten this far — route the user to `add-new-exercise`.
+
+  ## Common failure modes
+
+  - **Zero reps detected.** Wrong tempo preset, or pose detection failed mid-video. Inspect `np.isnan(landmarks).any()` and the detected-frame ratio first. Try `adaptive` next.
+  - **Template length looks wrong** (e.g. 5 frames). One rep with `first` method on a clipped video — check that the video shows full reps, not just the bottom position.
+  - **`save_template` writes to the wrong directory.** You forgot to `cd AI/` before running. Relative path `templates/` resolves from cwd.
+  - **Detected ratio < 90%.** Re-shoot or trim the video to the lift itself; busy backgrounds and partial occlusion tank MediaPipe.
+
+  ## What to report back
+
+  After step 4 succeeds, tell the user:
+  - Output file path and size.
+  - Number of reps available, which method was used, which rep was picked (if `best` / `first`).
+  - The `EXERCISE_MAPPING` line that now points to this template, or the line that needs adding.
+  - Whether they need to rebuild the Docker image (no — `templates/` is a bind-mounted volume in dev, and the file is read at request time).
+
+tags: [template, dtw, mediapipe, pipeline, pro-reference, npz]
