@@ -7,6 +7,11 @@ per-rep grades + feedback. Currently scoped to squat variations.
 For deep context see `README.md`, `ARCHITECTURE.md`, and `DOCKER_SETUP.md`.
 This file is for Claude — keep it short and task-oriented.
 
+> **Claude: read `knowledge.yaml` at the project root first.** It's the
+> KCP manifest indexing every doc, skill, command, and agent in this repo.
+> When you find a non-obvious lesson worth keeping (failed experiment,
+> tuning gotcha, container-path mismatch), append it to `LEARNINGS.md`.
+
 ## Stack
 
 | Service          | Tech                                               | Dir         | Port |
